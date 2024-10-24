@@ -1,43 +1,9 @@
 import numpy as np
-import math
-from numba import jitclass, njit, gdb_init
-from numba import uint32, int32, int32, b1, float64, float32
+from numba import njit
 
-spec = [
-    ("__board_size", int32),
-    ("__total_score", int32),
-    ("__score", int32),
-    ("__temp_board", uint32[:, :]),
-    ("__board", uint32[:, :]),
-    ("__done_merge", b1),
-    ("__done_cover_up", b1),
-    ("__invalid_count", uint32),
-    ("__total_count", uint32),
-    ("__invalid_move_warmup", uint32),
-    ("__invalid_move_threshold", float64),
-    ("__power_mat", uint32[:, :, :]),
-    ("__penalty", int32),
-]
-
-
-@jitclass(spec)
 class Game2048:
     def __init__(self, board_size: int, invalid_move_warmup=16, invalid_move_threshold=0.1, penalty=-512):
-        """
-        This class is responsible to implement the game. 
-
-        Parameters
-        ----------
-        board_size : int
-            Size of the board. Default=4
-        invalid_move_warmup : int
-            Minimum of invalid movements to finish the episode. Default=16
-        invalid_move_threshold : float
-            How much(fraction) invalid movements is necessary according to the total of moviments already executed. to finish the episode after invalid_move_warmup. Default 0.1 
-        penalty : int
-            Penalization of invalid movements to sum up in reward function. Default=-512
-        """
-
+        # Your initialization code remains the same
         self.__board_size = board_size
         self.__score = 0
         self.__total_score = 0
@@ -261,3 +227,11 @@ class Game2048:
         self.__total_count = 0
         self.__add_two_or_four()
         self.__add_two_or_four()
+
+
+game = Game2048(board_size=4)
+game.reset()
+for _ in range(10):
+    game.make_move(np.random.randint(0, 4))
+    game.confirm_move()
+    print(game.get_board())
