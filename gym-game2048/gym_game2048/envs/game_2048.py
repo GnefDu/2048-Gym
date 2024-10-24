@@ -278,4 +278,3 @@ for _ in range(20):
     game.make_move(move)
     game.confirm_move()
     print(game.get_board())
-
