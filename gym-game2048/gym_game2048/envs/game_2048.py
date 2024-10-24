@@ -1,30 +1,10 @@
 import numpy as np
-import math
-from numba import jitclass, njit, gdb_init
-from numba import uint32, int32, int32, b1, float64, float32
+from numba import njit
 
-spec = [
-    ("__board_size", int32),
-    ("__total_score", int32),
-    ("__score", int32),
-    ("__temp_board", uint32[:, :]),
-    ("__board", uint32[:, :]),
-    ("__done_merge", b1),
-    ("__done_cover_up", b1),
-    ("__invalid_count", uint32),
-    ("__total_count", uint32),
-    ("__invalid_move_warmup", uint32),
-    ("__invalid_move_threshold", float64),
-    ("__power_mat", uint32[:, :, :]),
-    ("__penalty", int32),
-]
-
-
-@jitclass(spec)
 class Game2048:
-    def __init__(self, board_size: int, invalid_move_warmup=16, invalid_move_threshold=0.1, penalty=-512):
+    def __init__(self, board_size: int, invalid_move_warmup=16, invalid_move_threshold=0.1, penalty=-512, dynamic_obstacle_interval=5):
         """
-        This class is responsible to implement the game. 
+        Initialize the 2048 game with dynamic obstacles.
 
         Parameters
         ----------
@@ -33,11 +13,12 @@ class Game2048:
         invalid_move_warmup : int
             Minimum of invalid movements to finish the episode. Default=16
         invalid_move_threshold : float
-            How much(fraction) invalid movements is necessary according to the total of moviments already executed. to finish the episode after invalid_move_warmup. Default 0.1 
+            Fraction of invalid movements necessary to finish the episode after invalid_move_warmup. Default=0.1 
         penalty : int
-            Penalization of invalid movements to sum up in reward function. Default=-512
+            Penalization of invalid movements. Default=-512
+        dynamic_obstacle_interval : int
+            Number of steps between spawning dynamic obstacles. Default=5
         """
-
         self.__board_size = board_size
         self.__score = 0
         self.__total_score = 0
@@ -46,10 +27,12 @@ class Game2048:
         self.__invalid_move_warmup = invalid_move_warmup
         self.__invalid_move_threshold = invalid_move_threshold
         self.__penalty = penalty
-        self.__board = np.zeros((board_size, board_size), dtype=np.uint32)
-        self.__temp_board = np.zeros((board_size, board_size), dtype=np.uint32)
+        self.__dynamic_obstacle_interval = dynamic_obstacle_interval
+        self.__board = np.zeros((board_size, board_size), dtype=np.int32)  # Allow obstacles
+        self.__temp_board = np.zeros((board_size, board_size), dtype=np.int32)
         self.__add_two_or_four()
         self.__add_two_or_four()
+        self.__add_dynamic_obstacle()
         self.__power_mat = np.zeros((board_size, board_size, 16 + (board_size - 4)), dtype=np.uint32)
 
     def __add_two_or_four(self):
@@ -67,6 +50,14 @@ class Game2048:
             self.__board[indexes[0][index]][indexes[1][index]] = 4
         else:
             self.__board[indexes[0][index]][indexes[1][index]] = 2
+
+    def __add_dynamic_obstacle(self):
+        """Add a dynamic obstacle (-1) to a random empty position."""
+        indexes = np.where(self.__board == 0)
+        if len(indexes[0]) == 0:
+            return
+        index = np.random.choice(np.arange(len(indexes[0])))
+        self.__board[indexes[0][index]][indexes[1][index]] = 3
 
     def __transpose(self, board):
         """Transpose a matrix."""
@@ -176,15 +167,20 @@ class Game2048:
         return self.__board
 
     def confirm_move(self):
-        """Execute movement."""
-        self.__total_count = self.__total_count + 1
-        self.__total_score = self.__total_score + self.__score
+        """Finalize the move and add dynamic obstacles periodically."""
+        self.__total_count += 1
+        self.__total_score += self.__score
+
         if np.array_equal(self.__board, self.__temp_board):
-            self.__invalid_count = self.__invalid_count + 1
+            self.__invalid_count += 1
             self.__score = self.__penalty
         else:
             self.__board = self.__temp_board.copy()
             self.__add_two_or_four()
+
+            # Add dynamic obstacles every few steps
+            if self.__total_count % self.__dynamic_obstacle_interval == 0:
+                self.__add_dynamic_obstacle()
 
     def make_move(self, move):
         """Make a move."""
@@ -261,3 +257,25 @@ class Game2048:
         self.__total_count = 0
         self.__add_two_or_four()
         self.__add_two_or_four()
+
+
+def moveTranslate(move):
+    if move == 0:
+        print("Up")
+    if move == 1:
+        print("Down")
+    if move == 2:
+        print("Right")
+    if move == 3:
+        print("Left")
+
+
+game = Game2048(board_size=4)
+game.reset()
+for _ in range(20):
+    move = np.random.randint(0, 4)
+    moveTranslate(move)
+    game.make_move(move)
+    game.confirm_move()
+    print(game.get_board())
+
