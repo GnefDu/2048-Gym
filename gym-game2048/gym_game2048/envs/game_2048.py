@@ -1,5 +1,4 @@
 import numpy as np
-from numba import njit
 
 class Game2048:
     def __init__(self, board_size: int, invalid_move_warmup=16, invalid_move_threshold=0.1, penalty=-512, dynamic_obstacle_interval=5):
@@ -30,6 +29,7 @@ class Game2048:
         self.__dynamic_obstacle_interval = dynamic_obstacle_interval
         self.__board = np.zeros((board_size, board_size), dtype=np.int32)  # Allow obstacles
         self.__temp_board = np.zeros((board_size, board_size), dtype=np.int32)
+        self.__tile_history = set() # to track tiles that appear
         self.__add_two_or_four()
         self.__add_two_or_four()
         self.__add_dynamic_obstacle()
@@ -48,8 +48,10 @@ class Game2048:
 
         if np.random.uniform(0, 1) >= 0.9:
             self.__board[indexes[0][index]][indexes[1][index]] = 4
+            self.__tile_history.add(4)
         else:
             self.__board[indexes[0][index]][indexes[1][index]] = 2
+            self.__tile_history.add(2)
 
     def __add_dynamic_obstacle(self):
         """Add a dynamic obstacle (-1) to a random empty position."""
@@ -58,6 +60,7 @@ class Game2048:
             return
         index = np.random.choice(np.arange(len(indexes[0])))
         self.__board[indexes[0][index]][indexes[1][index]] = 3
+        self.__tile_history.add(3)
 
     def __transpose(self, board):
         """Transpose a matrix."""
@@ -116,8 +119,12 @@ class Game2048:
                 if board[line][column] == board[line - 1][column] and board[line][column] != 3:
                     self.__score = self.__score + (board[line][column] * 2)
                     board[line - 1][column] = board[line - 1][column] * 2
+                    merged_value = int(board[line - 1][column])
                     board[line][column] = 0
                     self.__done_merge = True
+
+                    # Track new tile/merged value
+                    self.__tile_history.add(merged_value)
                 else:
                     continue
 
@@ -255,6 +262,10 @@ class Game2048:
                     power = int(np.log2(self.__board[line][column]))
                     self.__power_mat[line][column][power] = 1
 
+    def get_tile_history(self):
+        """Get the set of unique tiles that have appeared on the board."""
+        return sorted(self.__tile_history)
+
     def reset(self):
         "Reset the game."
         self.__board = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
@@ -263,6 +274,7 @@ class Game2048:
         self.__total_score = 0
         self.__invalid_count = 0
         self.__total_count = 0
+        self.__tile_history = set()
         self.__add_two_or_four()
         self.__add_two_or_four()
 
@@ -280,10 +292,12 @@ def moveTranslate(move):
 
 game = Game2048(board_size=4)
 game.reset()
+print("Welcome to 2048!")
+print(game.get_board())
 for _ in range(20):
     move = np.random.randint(0, 4)
     moveTranslate(move)
     game.make_move(move)
     game.confirm_move()
     print(game.get_board())
-
+    print(game.get_tile_history())
