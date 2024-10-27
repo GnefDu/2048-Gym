@@ -1,23 +1,9 @@
-import gym
-# import gym_game2048
-# from envs.env import Game2048Env
 from gym_game2048.envs.env import Game2048Env
-# import game_2048
+from gym_game2048.envs.game_2048 import Game2048
 import numpy as np
 
 def set_board(env, board):
     env.board = board
-
-def play_to_64(env):
-    done = False
-    while not done:
-        action = env.action_space.sample()  # Random action, replace with a better strategy
-        # yeah it should not be a random action
-        _, reward, done, info = env.step(action)
-        if any(64 in row for row in env.board):
-            print("Reached 64!")
-            break
-
 
 def generate_random_board():
     board = np.zeros((4, 4), dtype=np.int32)
@@ -28,24 +14,25 @@ def generate_random_board():
         board[row, col] = value
     return board
 
-
 def main():
-    env = Game2048Env(board_size=4, binary=False, extractor="cnn")
-    env.reset()
+    env = Game2048Env(board_size=4)
+    init_state = env.reset()
     done = False
-    for _ in range(20):
+    print("Initial state:")
+    print(init_state.reshape(4, 4))
+    for i in range(100):
         if done:
+            print("Game over!")
             break
         move = env.action_space.sample()
-        # move = np.random.randint(0, 4)
         next_state, reward, done, info = env.step(move)
 
-        # game.moveTranslate(move)
-        # game.make_move(move)
-        # game.confirm_move()
+        print(f"Step: {i+1}")
+        print(f"Move: {info['move']}")
         print(f"Reward: {reward}")
         print(f"Total score: {info['total_score']}")
         print(next_state)
+        print("-----------------")
         
 
 if __name__ == "__main__":
