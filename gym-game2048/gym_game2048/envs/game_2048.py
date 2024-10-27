@@ -111,7 +111,7 @@ class Game2048:
                 if board[line][column] == board[line - 1][column]:
                     if (board[line][column] == self.__dynamic_obstacle_value):
                         self.__score = self.__score + (board[line][column] * 2)
-                        self.__score += self.__obstacle_reward * self.__num_obstacles
+                        self.__score += self.__obstacle_reward
                         board[line - 1][column] = 0
                         board[line][column] = 0
                         self.__num_obstacles -= 2
