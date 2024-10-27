@@ -23,6 +23,14 @@ def show_obstacle_collision():
 
     return board
 
+def generate_random_board():
+    board = np.zeros((4, 4), dtype=np.int32)
+    for _ in range(2):
+        row = np.random.randint(0, 4)
+        col = np.random.randint(0, 4)
+        value = np.random.choice([2, 4])
+        board[row, col] = value
+    return board
 
 if __name__ == "__main__":
     show_obstacle_collision()
