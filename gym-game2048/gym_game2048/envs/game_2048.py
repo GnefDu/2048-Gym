@@ -1,8 +1,8 @@
 import numpy as np
-from numba import njit
+
 
 class Game2048:
-    def __init__(self, board_size: int, invalid_move_warmup=16, invalid_move_threshold=0.1, penalty=-512, dynamic_obstacle_interval=5):
+    def __init__(self, board_size: int, invalid_move_warmup=16, invalid_move_threshold=0.1, penalty=-512, dynamic_obstacle_interval=5, dynamic_obstacle_value=1):
         """
         Initialize the 2048 game with dynamic obstacles.
 
@@ -28,12 +28,14 @@ class Game2048:
         self.__invalid_move_threshold = invalid_move_threshold
         self.__penalty = penalty
         self.__dynamic_obstacle_interval = dynamic_obstacle_interval
+        self.__num_obstacles = 0
+        self.__dynamic_obstacle_value = dynamic_obstacle_value
         self.__board = np.zeros((board_size, board_size), dtype=np.int32)  # Allow obstacles
         self.__temp_board = np.zeros((board_size, board_size), dtype=np.int32)
+        self.__obstacle_reward = 4 # small reward for colliding obstacles 
         self.__add_two_or_four()
         self.__add_two_or_four()
         self.__add_dynamic_obstacle()
-        self.__power_mat = np.zeros((board_size, board_size, 16 + (board_size - 4)), dtype=np.uint32)
 
     def __add_two_or_four(self):
         """Add tile with number two."""
@@ -57,7 +59,8 @@ class Game2048:
         if len(indexes[0]) == 0:
             return
         index = np.random.choice(np.arange(len(indexes[0])))
-        self.__board[indexes[0][index]][indexes[1][index]] = 3
+        self.__board[indexes[0][index]][indexes[1][index]] = 1
+        self.__num_obstacles+=1
 
     def __transpose(self, board):
         """Transpose a matrix."""
@@ -106,9 +109,16 @@ class Game2048:
         for line in range(1, self.__board_size):
             for column in range(self.__board_size):
                 if board[line][column] == board[line - 1][column]:
-                    self.__score = self.__score + (board[line][column] * 2)
-                    board[line - 1][column] = board[line - 1][column] * 2
-                    board[line][column] = 0
+                    if (board[line][column] == self.__dynamic_obstacle_value):
+                        self.__score = self.__score + (board[line][column] * 2)
+                        self.__score += self.__obstacle_reward * self.__num_obstacles
+                        board[line - 1][column] = 0
+                        board[line][column] = 0
+                        self.__num_obstacles -= 2
+                    else:
+                        self.__score = self.__score + (board[line][column] * 2)
+                        board[line - 1][column] = board[line - 1][column] * 2
+                        board[line][column] = 0
                     self.__done_merge = True
                 else:
                     continue
@@ -203,12 +213,11 @@ class Game2048:
         ):
             return True, self.__penalty
 
-        # Verify zero entries
-        for line in range(self.__board_size):
-            for column in range(self.__board_size):
-                if self.__board[line][column] == 0:
-                    return False, 0
 
+        has_zero_entries = np.any(self.__board == 0)
+        if has_zero_entries:
+            return False, 0
+        
         # Verify possible merges
         for line in range(1, self.__board_size):
             for column in range(1, self.__board_size):
@@ -218,7 +227,7 @@ class Game2048:
                 ):
                     return False, 0
 
-        # Veirfy possible merges in first column and first line
+        # Verify possible merges in first column and first line
         for line in range(1, self.__board_size):
             if self.__board[line][0] == self.__board[line - 1][0]:
                 return False, 0
@@ -229,24 +238,6 @@ class Game2048:
 
         return True, self.__penalty
 
-    def get_power_2_mat(self):
-        "Get power 2 matrix."
-        return self.__power_mat
-
-    def transform_board_to_power_2_mat(self):
-        "Transform board to a power 2 matrix."
-        self.__power_mat = np.zeros(
-            shape=(self.__board_size, self.__board_size, 16 + (self.__board_size - 4)), dtype=np.uint32
-        )
-
-        for line in range(self.__board_size):
-            for column in range(self.__board_size):
-                if self.__board[line][column] == 0:
-                    self.__power_mat[line][column][0] = 1
-                else:
-                    power = int(np.log2(self.__board[line][column]))
-                    self.__power_mat[line][column][power] = 1
-
     def reset(self):
         "Reset the game."
         self.__board = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
@@ -255,26 +246,19 @@ class Game2048:
         self.__total_score = 0
         self.__invalid_count = 0
         self.__total_count = 0
+        self.__num_obstacles = 0
         self.__add_two_or_four()
         self.__add_two_or_four()
 
-
-def moveTranslate(move):
-    if move == 0:
-        print("Up")
-    if move == 1:
-        print("Down")
-    if move == 2:
-        print("Right")
-    if move == 3:
-        print("Left")
-
-
-game = Game2048(board_size=4)
-game.reset()
-for _ in range(20):
-    move = np.random.randint(0, 4)
-    moveTranslate(move)
-    game.make_move(move)
-    game.confirm_move()
-    print(game.get_board())
+    def moveTranslate(self,move):
+        '''
+        Translate the move to a human readable format.
+        '''
+        if move == 0:
+            return("Up ↑")
+        if move == 1:
+            return("Down ↓")
+        if move == 2:
+            return("Right →")
+        if move == 3:
+            return("Left ←")
