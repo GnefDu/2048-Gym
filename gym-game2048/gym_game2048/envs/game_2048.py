@@ -1,5 +1,4 @@
 import numpy as np
-from numba import njit
 
 class Game2048:
     def __init__(self, board_size: int, invalid_move_warmup=16, invalid_move_threshold=0.1, penalty=-512, dynamic_obstacle_interval=5):
