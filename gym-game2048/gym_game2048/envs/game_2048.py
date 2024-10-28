@@ -106,6 +106,14 @@ class Game2048:
 
         self.__done_merge = False
 
+        # Merge dynamic obstacles (3)
+        for line in range(self.__board_size):
+            for column in range(self.__board_size):
+                if board[line][column] == 3 and board[line - 1][column] == 3:
+                    # Remove one dynamic obstacle
+                    board[line][column] = 0
+                    self.__done_merge = True
+
         for line in range(1, self.__board_size):
             for column in range(self.__board_size):
                 if board[line][column] == board[line - 1][column]:
