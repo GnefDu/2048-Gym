@@ -119,7 +119,15 @@ class Game2048Env(gym.Env):
         return self.state
 
     def render(self, mode="human"):
-        pass
+        """Render the current board state in a human-readable format."""
+        # Obtain the board from the game
+        board = self.__game.get_board()
+        board_display = "\n".join(["\t".join(map(str, row)) for row in board])
+        
+        # Display the current board state
+        print("Current Board State:\n")
+        print(board_display)
+        print("\n" + "-" * 20)
 
     def get_board(self):
         "Get the board."
