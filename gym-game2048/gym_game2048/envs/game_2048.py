@@ -37,6 +37,9 @@ class Game2048:
         self.__add_two_or_four()
         self.__add_dynamic_obstacle()
 
+# Methods for adding tiels
+
+    # Adds standard tiles to play
     def __add_two_or_four(self):
         """Add tile with number two."""
 
@@ -53,6 +56,7 @@ class Game2048:
         else:
             self.__board[indexes[0][index]][indexes[1][index]] = 2
 
+    # Adds dynamic obstacle tiles to play
     def __add_dynamic_obstacle(self):
         """Add a dynamic obstacle (-1) to a random empty position."""
         indexes = np.where(self.__board == 0)
@@ -61,6 +65,9 @@ class Game2048:
         index = np.random.choice(np.arange(len(indexes[0])))
         self.__board[indexes[0][index]][indexes[1][index]] = 1
         self.__num_obstacles+=1
+
+
+# Board manipulation methods
 
     def __transpose(self, board):
         """Transpose a matrix."""
@@ -106,14 +113,14 @@ class Game2048:
 
         self.__done_merge = False
 
-        # Merge dynamic obstacles (3)
+        # Merge dynamic obstacles (1)
         for line in range(self.__board_size):
             for column in range(self.__board_size):
                 if board[line][column] == 3 and board[line - 1][column] == 3:
                     # Remove one dynamic obstacle
                     board[line][column] = 0
                     self.__done_merge = True
-
+        # Merge regular tiles
         for line in range(1, self.__board_size):
             for column in range(self.__board_size):
                 if board[line][column] == board[line - 1][column]:
@@ -132,7 +139,8 @@ class Game2048:
                     continue
 
         return board
-
+    
+# Directional moves
     def __up(self):
 
         temp = self.__cover_up(self.__board)
@@ -164,6 +172,7 @@ class Game2048:
         temp = self.__transpose(temp)
         self.__temp_board = temp
 
+# Scoring and board state methods
     def get_move_score(self):
         """Get the last score move."""
 
@@ -183,6 +192,7 @@ class Game2048:
         """Get the actual board."""
 
         return self.__board
+
 
     def confirm_move(self):
         """Finalize the move and add dynamic obstacles periodically."""
