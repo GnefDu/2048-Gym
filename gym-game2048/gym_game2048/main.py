@@ -1,4 +1,10 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from gym_game2048.envs.env import Game2048Env
+
+
 
 def main():
     env = Game2048Env(board_size=4)
@@ -7,7 +13,7 @@ def main():
     print("Initial state:")
     print(init_state.reshape(4, 4))
     print("-----------------")
-    for i in range(100):
+    for i in range(200):
         if done:
             print("Game over!")
             break

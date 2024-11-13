@@ -37,7 +37,7 @@ class Game2048:
         self.__add_two_or_four()
         self.__add_dynamic_obstacle()
 
-# Methods for adding tiels
+# Methods for adding tiles
 
     # Adds standard tiles to play
     def __add_two_or_four(self):
@@ -224,37 +224,52 @@ class Game2048:
             self.__left()
 
     def verify_game_state(self):
-        "Check if the game has done or not."
-        if (
-            self.__invalid_count > self.__invalid_move_warmup
-            and self.__invalid_count > self.__invalid_move_threshold * self.__total_count
-        ):
-            return True, self.__penalty
+        """
+        Check if the game is over. The game ends when:
+        1. There are no empty tiles AND
+        2. No moves result in a valid state change.
+        """
+        # Check for empty spaces
+        if np.any(self.__board == 0):
+            return False, 0 
 
+        # Simulate all possible moves to check for validity
+        for move in range(4):
+            temp_board = self.__board.copy()
+            if self.__simulate_move(temp_board, move):
+                return False, 0  
 
-        has_zero_entries = np.any(self.__board == 0)
-        if has_zero_entries:
-            return False, 0
-        
-        # Verify possible merges
-        for line in range(1, self.__board_size):
-            for column in range(1, self.__board_size):
-                if (
-                    self.__board[line][column] == self.__board[line][column - 1]
-                    or self.__board[line][column] == self.__board[line - 1][column]
-                ):
-                    return False, 0
-
-        # Verify possible merges in first column and first line
-        for line in range(1, self.__board_size):
-            if self.__board[line][0] == self.__board[line - 1][0]:
-                return False, 0
-
-        for column in range(1, self.__board_size):
-            if self.__board[0][column] == self.__board[0][column - 1]:
-                return False, 0
-
+        # No valid moves left
         return True, self.__penalty
+
+    def __simulate_move(self, board, move):
+        """
+        Simulate a move and return whether it results in a state change.
+        """
+        temp = None
+        if move == 0:  # Up
+            temp = self.__cover_up(board)
+            temp = self.__merge(temp)
+            temp = self.__cover_up(temp)
+        elif move == 1:  # Down
+            temp = self.__reverse(board)
+            temp = self.__merge(temp)
+            temp = self.__cover_up(temp)
+            temp = self.__reverse(temp)
+        elif move == 2:  # Right
+            temp = self.__reverse(self.__transpose(board))
+            temp = self.__merge(temp)
+            temp = self.__cover_up(temp)
+            temp = self.__transpose(self.__reverse(temp))
+        elif move == 3:  # Left
+            temp = self.__transpose(board)
+            temp = self.__merge(temp)
+            temp = self.__cover_up(temp)
+            temp = self.__transpose(temp)
+
+        # Return whether the board changed
+        return not np.array_equal(board, temp)
+
 
     def reset(self):
         "Reset the game."
@@ -280,3 +295,25 @@ class Game2048:
             return("Right →")
         if move == 3:
             return("Left ←")
+
+
+def moveTranslate(move):
+    if move == 0:
+        print("Up")
+    if move == 1:
+        print("Down")
+    if move == 2:
+        print("Right")
+    if move == 3:
+        print("Left")
+
+game = Game2048(board_size=4)
+game.reset()
+for _ in range(100):
+    move = np.random.randint(0, 4)
+    #moveTranslate(move)
+    game.make_move(move)
+    game.confirm_move()
+    print(game.get_board())
+
+
