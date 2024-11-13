@@ -13,16 +13,19 @@ def main():
     print("Initial state:")
     print(init_state.reshape(4, 4))
     print("-----------------")
+    total_reward = 0
     for i in range(200):
         if done:
             print("Game over!")
             break
         move = env.action_space.sample()
         next_state, reward, done, info = env.step(move)
+        total_reward += reward
 
         print(f"Step: {i}")
         print(f"Move: {info['move']}")
         print(f"Reward: {reward}")
+        print(f"Total Reward: {total_reward}")
         print(f"Total score: {info['total_score']}")
         print(next_state)
         print("-----------------")
