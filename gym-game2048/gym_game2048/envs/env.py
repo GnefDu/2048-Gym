@@ -3,7 +3,7 @@ import numpy as np
 import sys
 from gym.utils import seeding
 from gym import spaces
-from gym_game2048.envs.game_2048 import Game2048
+from .game_2048 import Game2048
 
 
 class Game2048Env(gym.Env):

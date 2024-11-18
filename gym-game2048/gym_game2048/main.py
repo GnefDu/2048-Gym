@@ -2,8 +2,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from gym_game2048.envs.env import Game2048Env
-
+from envs.env import Game2048Env
 
 
 def main():
@@ -29,7 +28,7 @@ def main():
         print(f"Total score: {info['total_score']}")
         print(next_state)
         print("-----------------")
-        
+
 
 if __name__ == "__main__":
     main()
