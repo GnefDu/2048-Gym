@@ -72,7 +72,7 @@ class Game2048:
     def __transpose(self, board):
         """Transpose a matrix."""
 
-        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
+        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
 
         for line in range(self.__board_size):
             for column in range(self.__board_size):
@@ -83,7 +83,7 @@ class Game2048:
     def __reverse(self, board):
         """Reverse a matrix."""
 
-        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
+        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
 
         for line in range(self.__board_size):
             for column in range(self.__board_size):
@@ -94,7 +94,7 @@ class Game2048:
     def __cover_up(self, board):
         """Cover the most antecedent zeros with non-zero number. """
 
-        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
+        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
         self.__done_cover_up = False
 
         for column in range(self.__board_size):
@@ -258,8 +258,8 @@ class Game2048:
 
     def reset(self):
         "Reset the game."
-        self.__board = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
-        self.__temp_board = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
+        self.__board = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
+        self.__temp_board = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
         self.__score = 0
         self.__total_score = 0
         self.__invalid_count = 0
