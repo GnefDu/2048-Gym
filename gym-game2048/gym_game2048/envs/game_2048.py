@@ -225,50 +225,26 @@ class Game2048:
 
     def verify_game_state(self):
         """
-        Check if the game is over. The game ends when:
-        1. There are no empty tiles AND
-        2. No moves result in a valid state change.
+        Check if the game is over.
         """
         # Check for empty spaces
         if np.any(self.__board == 0):
-            return False, 0 
+            return False, 0  # Not game over
 
-        # Simulate all possible moves to check for validity
-        for move in range(4):
-            temp_board = self.__board.copy()
-            if self.__simulate_move(temp_board, move):
-                return False, 0  
+        # Check for adjacent tiles with the same value
+        for row in range(self.__board_size):
+            for col in range(self.__board_size):
+                if row > 0 and self.__board[row][col] == self.__board[row - 1][col]:
+                    return False, 0  # Not game over (vertical match)
+                if col > 0 and self.__board[row][col] == self.__board[row][col - 1]:
+                    return False, 0  # Not game over (horizontal match)
+                if row < self.__board_size - 1 and self.__board[row][col] == self.__board[row + 1][col]:
+                    return False, 0  # Not game over (vertical match)
+                if col < self.__board_size - 1 and self.__board[row][col] == self.__board[row][col + 1]:
+                    return False, 0  # Not game over (horizontal match)
 
-        # No valid moves left
+        # No empty tiles or adjacent matches; game is over
         return True, self.__penalty
-
-    def __simulate_move(self, board, move):
-        """
-        Simulate a move and return whether it results in a state change.
-        """
-        temp = None
-        if move == 0:  # Up
-            temp = self.__cover_up(board)
-            temp = self.__merge(temp)
-            temp = self.__cover_up(temp)
-        elif move == 1:  # Down
-            temp = self.__reverse(board)
-            temp = self.__merge(temp)
-            temp = self.__cover_up(temp)
-            temp = self.__reverse(temp)
-        elif move == 2:  # Right
-            temp = self.__reverse(self.__transpose(board))
-            temp = self.__merge(temp)
-            temp = self.__cover_up(temp)
-            temp = self.__transpose(self.__reverse(temp))
-        elif move == 3:  # Left
-            temp = self.__transpose(board)
-            temp = self.__merge(temp)
-            temp = self.__cover_up(temp)
-            temp = self.__transpose(temp)
-
-        # Return whether the board changed
-        return not np.array_equal(board, temp)
 
 
     def reset(self):
