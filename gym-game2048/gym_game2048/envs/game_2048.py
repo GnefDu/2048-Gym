@@ -33,9 +33,9 @@ class Game2048:
         self.__board = np.zeros((board_size, board_size), dtype=np.int32)  # Allow obstacles
         self.__temp_board = np.zeros((board_size, board_size), dtype=np.int32)
         self.__obstacle_reward = 4 # small reward for colliding obstacles 
+        self.max_tile = 0
         self.__add_two_or_four()
         self.__add_two_or_four()
-        self.__add_dynamic_obstacle()
 
 # Methods for adding tiles
 
@@ -110,36 +110,34 @@ class Game2048:
 
     def __merge(self, board):
         """Verify if a merge is possible and execute."""
-
-        self.__done_merge = False
-
-        # Merge dynamic obstacles (1)
-        for line in range(self.__board_size):
-            for column in range(self.__board_size):
-                if board[line][column] == 3 and board[line - 1][column] == 3:
-                    # Remove one dynamic obstacle
-                    board[line][column] = 0
-                    self.__done_merge = True
+        score = 0
         # Merge regular tiles
         for line in range(1, self.__board_size):
             for column in range(self.__board_size):
                 if board[line][column] == board[line - 1][column]:
-                    if (board[line][column] == self.__dynamic_obstacle_value):
-                        self.__score = self.__score + (board[line][column] * 2)
-                        self.__score += self.__obstacle_reward
+                    if (board[line][column] == self.__dynamic_obstacle_value): # dynamic obstacle merge
+                        score += (board[line][column] * 2) * self.__obstacle_reward + int(1/max(1, self.getNumEmptyTiles()))
                         board[line - 1][column] = 0
                         board[line][column] = 0
                         self.__num_obstacles -= 2
                     else:
-                        self.__score = self.__score + (board[line][column] * 2)
+                        score = score + (board[line][column] * 2)
                         board[line - 1][column] = board[line - 1][column] * 2
                         board[line][column] = 0
-                    self.__done_merge = True
                 else:
                     continue
-
+        self.score = score
         return board
     
+
+    def getMaxTile(self):
+        return np.amax(self.__board)
+    
+    def getNumObstacles(self):
+        return np.sum(self.__board == 1)
+    
+    def getNumEmptyTiles(self):
+        return np.sum(self.__board == 0)
 # Directional moves
     def __up(self):
 
@@ -172,6 +170,36 @@ class Game2048:
         temp = self.__transpose(temp)
         self.__temp_board = temp
 
+    def compute_smoothness_penalty(self):
+        """
+        Compute the smoothness penalty of the board.
+        Smoothness is measured as the sum of the absolute differences between
+        the values of adjacent tiles (horizontally and vertically).
+        
+        Args:
+            board (np.ndarray): 2D array representing the 2048 board.
+        
+        Returns:
+            float: Smoothness penalty (lower is smoother).
+        """
+        smoothness = 0
+        
+        # Iterate through each tile
+        for i in range(self.board.shape[0]):
+            for j in range(self.board.shape[1]):
+                if self.board[i, j] != 0:  # Consider only non-zero tiles
+                    current_value = self.board[i, j]
+                    
+                    # Check horizontal neighbor (right)
+                    if j + 1 < self.board.shape[1] and self.board[i, j + 1] != 0:
+                        smoothness += abs(current_value - self.board[i, j + 1])
+                    
+                    # Check vertical neighbor (down)
+                    if i + 1 < self.board.shape[0] and self.board[i + 1, j] != 0:
+                        smoothness += abs(current_value - self.board[i + 1, j])
+        
+        return smoothness
+
 # Scoring and board state methods
     def get_move_score(self):
         """Get the last score move."""
@@ -193,7 +221,6 @@ class Game2048:
 
         return self.__board
 
-
     def confirm_move(self):
         """Finalize the move and add dynamic obstacles periodically."""
         self.__total_count += 1
@@ -207,8 +234,8 @@ class Game2048:
             self.__add_two_or_four()
 
             # Add dynamic obstacles every few steps
-            if self.__total_count % self.__dynamic_obstacle_interval == 0:
-                self.__add_dynamic_obstacle()
+            # if self.__total_count % self.__dynamic_obstacle_interval == 0:
+            #     self.__add_dynamic_obstacle()
 
     def make_move(self, move):
         """Make a move."""
@@ -297,23 +324,12 @@ class Game2048:
             return("Left ←")
 
 
-def moveTranslate(move):
-    if move == 0:
-        print("Up")
-    if move == 1:
-        print("Down")
-    if move == 2:
-        print("Right")
-    if move == 3:
-        print("Left")
-
-game = Game2048(board_size=4)
-game.reset()
-for _ in range(100):
-    move = np.random.randint(0, 4)
-    #moveTranslate(move)
-    game.make_move(move)
-    game.confirm_move()
-    print(game.get_board())
-
-
+# def moveTranslate(self, move):
+#     if move == 0:
+#         print("Up")
+#     if move == 1:
+#         print("Down")
+#     if move == 2:
+#         print("Right")
+#     if move == 3:
+#         print("Left")

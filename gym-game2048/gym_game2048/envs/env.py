@@ -44,6 +44,8 @@ class Game2048Env(gym.Env):
         self.__total_score = 0
         self.__board_size = board_size
 
+
+
     def step(self, action):
         """
         Execute an action.
@@ -68,7 +70,12 @@ class Game2048Env(gym.Env):
         
         # Verify the game state and update reward and penalties
         self.__done, penalty = self.__game.verify_game_state()
+
         reward = self.__game.get_move_score() + penalty
+        if self.__done:
+            reward += self.__game.get_total_score()
+
+
         self.__n_iter = self.__n_iter + 1 
         after_move = self.__game.get_board()
 
@@ -90,6 +97,33 @@ class Game2048Env(gym.Env):
         self.state = self.__game.get_board()
         return self.state
 
+
+    
+    def calculate_reward(self, board, move_score, new_board, score, done):
+        reward = 0
+
+        # Reward for score increment (normalize to [-1, 1] based on max score delta)
+        max_score_delta = 2048  # Adjust as needed
+        reward += np.clip((new_board.score - board.score) / max_score_delta, -1, 1)
+        
+        # Reward for tile merges (normalize to [-1, 1] based on max merge value)
+        max_merge_value = 4096  # Adjust as needed
+        reward += np.clip(0.1 * move_score/ max_merge_value, -1, 1)
+        
+        # Bonus for empty tiles (normalize based on max possible tiles)
+        max_empty_tiles = 16  # For a 4x4 grid
+        reward += np.clip(2 * self.__game.getNumEmptyTiles() / max_empty_tiles, -1, 1)
+        
+        # Penalty for lack of smoothness (assume max penalty is known)
+        max_smoothness_penalty = 100  # Empirical or estimated value
+        reward -= np.clip(self.__game.compute_smoothness_penalty() / max_smoothness_penalty, -1, 1)
+        
+        # Game over penalty
+        if done:
+            reward -= 1  # Already scaled appropriately
+
+        return reward
+
     def render(self, mode="human"):
         """Render the current board state in a human-readable format."""
         # Obtain the board from the game
@@ -101,8 +135,29 @@ class Game2048Env(gym.Env):
         print(board_display)
         print("\n" + "-" * 20)
 
-    def get_board(self):
-        "Get the board."
+    def oneHotEncoding(board):
+        """
+        Converts the 2048 grid state into a one-hot encoding representation of the board with 13 channels. Each tile corresponds to a one-hot vector where its value x will be 1 in the index log_2 x.
 
+        one_hot[0]: the empty tile index
+        one_hot[1]: the dynamic tile index
+        one_hot[2:13]: the power of 2 tiles, from 1(2^1=2) to 11(2^11=2048)
+        Returns a numpy array of shape (4,4,13)
+        """
+        one_hot = np.zeros((4,4,13), dtype=np.float32)
+        for row in range(4):
+            for col in range(4):
+                tile = board[row][col]
+                if tile == 0:
+                    one_hot[row][col][0] = 1
+                elif tile == 1: # account for dynamic obstacle values
+                    one_hot[row][col][0] = 1
+                else:
+                    # shift tile value by 2 because the first 2 indices are reserved for empty tile and dynamic tile. No, shift by 1 because you start at log 2 =1 (+1) = 2.
+                    hot_index = int(np.log2(tile)) + 1
+                    one_hot[row][col][hot_index] = 1
+        return one_hot
+
+    def get_board(self):
         return self.__game.get_board()
 
