@@ -20,13 +20,13 @@ class Game2048:
             Number of steps between spawning dynamic obstacles. Default=5
         """
         self.__board_size = board_size
-        self.__score = 0
-        self.__total_score = 0
+        self.__score = np.int32(0)
+        self.__total_score = np.int32(0)
         self.__invalid_count = 0
         self.__total_count = 0
         self.__invalid_move_warmup = invalid_move_warmup
         self.__invalid_move_threshold = invalid_move_threshold
-        self.__penalty = penalty
+        self.__penalty = np.int32(penalty)
         self.__dynamic_obstacle_interval = dynamic_obstacle_interval
         self.__num_obstacles = 0
         self.__dynamic_obstacle_value = dynamic_obstacle_value
@@ -72,7 +72,7 @@ class Game2048:
     def __transpose(self, board):
         """Transpose a matrix."""
 
-        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
+        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
 
         for line in range(self.__board_size):
             for column in range(self.__board_size):
@@ -83,7 +83,7 @@ class Game2048:
     def __reverse(self, board):
         """Reverse a matrix."""
 
-        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
+        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
 
         for line in range(self.__board_size):
             for column in range(self.__board_size):
@@ -94,7 +94,7 @@ class Game2048:
     def __cover_up(self, board):
         """Cover the most antecedent zeros with non-zero number. """
 
-        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
+        temp = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
         self.__done_cover_up = False
 
         for column in range(self.__board_size):
@@ -113,6 +113,9 @@ class Game2048:
 
         self.__done_merge = False
 
+        # Initialize score as int32
+        self.__score = np.int32(self.__score)
+
         # Merge dynamic obstacles (1)
         for line in range(self.__board_size):
             for column in range(self.__board_size):
@@ -125,13 +128,17 @@ class Game2048:
             for column in range(self.__board_size):
                 if board[line][column] == board[line - 1][column]:
                     if (board[line][column] == self.__dynamic_obstacle_value):
-                        self.__score = self.__score + (board[line][column] * 2)
-                        self.__score += self.__obstacle_reward
+                        # Convert to int32 before arithmetic operations
+                        score_increment = np.int32(board[line][column] * 2)
+                        self.__score = np.int32(self.__score + score_increment)
+                        self.__score = np.int32(self.__score + self.__obstacle_reward)
                         board[line - 1][column] = 0
                         board[line][column] = 0
                         self.__num_obstacles -= 2
                     else:
-                        self.__score = self.__score + (board[line][column] * 2)
+                        # Convert to int32 before arithmetic operations
+                        score_increment = np.int32(board[line][column] * 2)
+                        self.__score = np.int32(self.__score + score_increment)
                         board[line - 1][column] = board[line - 1][column] * 2
                         board[line][column] = 0
                     self.__done_merge = True
@@ -176,12 +183,12 @@ class Game2048:
     def get_move_score(self):
         """Get the last score move."""
 
-        return self.__score
+        return float(self.__score)
 
     def get_total_score(self):
         """Get the total score gained until now."""
 
-        return self.__total_score
+        return float(self.__total_score)
 
     def set_board(self, board):
         """This function is only for test purpose."""
@@ -273,8 +280,8 @@ class Game2048:
 
     def reset(self):
         "Reset the game."
-        self.__board = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
-        self.__temp_board = np.zeros((self.__board_size, self.__board_size), dtype=np.uint32)
+        self.__board = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
+        self.__temp_board = np.zeros((self.__board_size, self.__board_size), dtype=np.int32)
         self.__score = 0
         self.__total_score = 0
         self.__invalid_count = 0
