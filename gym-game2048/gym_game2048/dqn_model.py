@@ -3,14 +3,11 @@ from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Input, Dense, Dropout, Activation, Flatten, Conv2D, MaxPooling2D, BatchNormalization
 import numpy as np
 
-class DQNModel:
+class dqn_model:
   NUM_ACTIONS = 4
-
+  LEARNING_RATE = 0.0001
   def __init__(self, learning_rate=0.0001, size=(4,4)):
-    # self.model = Sequential()
     self.size=size
-    
-    # model = self.build_model()
 
 # this is a poor model, replace it.
   def build_model(self):
@@ -63,8 +60,8 @@ class DQNModel:
     input = Input(shape=(self.size[0], self.size[1], 13))
     model = Sequential([
       Input(shape=(self.size[0], self.size[1], 13) ),
-      Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same'),
-      Conv2D(filters=256, kernel_size=(3, 2), activation='relu', padding='same'),
+      Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='valid'),
+      Conv2D(filters=256, kernel_size=(2, 2), activation='relu', padding='same'),
       Flatten(),
       Dense(256, activation='relu'),
       Dropout(0.2),

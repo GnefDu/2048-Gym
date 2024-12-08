@@ -185,18 +185,18 @@ class Game2048:
         smoothness = 0
         
         # Iterate through each tile
-        for i in range(self.board.shape[0]):
-            for j in range(self.board.shape[1]):
-                if self.board[i, j] != 0:  # Consider only non-zero tiles
-                    current_value = self.board[i, j]
+        for i in range(self.__board.shape[0]):
+            for j in range(self.__board.shape[1]):
+                if self.__board[i, j] != 0:  # Consider only non-zero tiles
+                    current_value = self.__board[i, j]
                     
                     # Check horizontal neighbor (right)
-                    if j + 1 < self.board.shape[1] and self.board[i, j + 1] != 0:
-                        smoothness += abs(current_value - self.board[i, j + 1])
+                    if j + 1 < self.__board.shape[1] and self.__board[i, j + 1] != 0:
+                        smoothness += abs(current_value - self.__board[i, j + 1])
                     
                     # Check vertical neighbor (down)
-                    if i + 1 < self.board.shape[0] and self.board[i + 1, j] != 0:
-                        smoothness += abs(current_value - self.board[i + 1, j])
+                    if i + 1 < self.__board.shape[0] and self.__board[i + 1, j] != 0:
+                        smoothness += abs(current_value - self.__board[i + 1, j])
         
         return smoothness
 
@@ -322,14 +322,3 @@ class Game2048:
             return("Right →")
         if move == 3:
             return("Left ←")
-
-
-# def moveTranslate(self, move):
-#     if move == 0:
-#         print("Up")
-#     if move == 1:
-#         print("Down")
-#     if move == 2:
-#         print("Right")
-#     if move == 3:
-#         print("Left")

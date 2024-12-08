@@ -45,7 +45,6 @@ class Game2048Env(gym.Env):
         self.__board_size = board_size
 
 
-
     def step(self, action):
         """
         Execute an action.
@@ -66,18 +65,20 @@ class Game2048Env(gym.Env):
         before_move = self.__game.get_board().copy()
         self.__game.make_move(action)
         self.__game.confirm_move()
-        self.state = self.__game.get_board()
+        self.state = self.normalized_values(self.__game.get_board())
         
         # Verify the game state and update reward and penalties
         self.__done, penalty = self.__game.verify_game_state()
 
-        reward = self.__game.get_move_score() + penalty
-        if self.__done:
-            reward += self.__game.get_total_score()
-
+        # reward = self.__game.get_move_score() + penalty
+        # if self.__done:
+        #     reward += self.__game.get_total_score()
 
         self.__n_iter = self.__n_iter + 1 
         after_move = self.__game.get_board()
+
+        move_score = self.__game.get_move_score()
+        reward = self.calculate_reward(move_score, self.__done)
 
         # Update info
         info["total_score"] = self.__game.get_total_score()
@@ -98,13 +99,12 @@ class Game2048Env(gym.Env):
         return self.state
 
 
-    
-    def calculate_reward(self, board, move_score, new_board, score, done):
+    def calculate_reward(self, move_score, done):
         reward = 0
 
-        # Reward for score increment (normalize to [-1, 1] based on max score delta)
-        max_score_delta = 2048  # Adjust as needed
-        reward += np.clip((new_board.score - board.score) / max_score_delta, -1, 1)
+        # # Reward for score increment (normalize to [-1, 1] based on max score delta)
+        # max_score_delta = 2048  # Adjust as needed
+        # reward += np.clip((new_board.score - board.score) / max_score_delta, -1, 1)
         
         # Reward for tile merges (normalize to [-1, 1] based on max merge value)
         max_merge_value = 4096  # Adjust as needed
@@ -135,7 +135,7 @@ class Game2048Env(gym.Env):
         print(board_display)
         print("\n" + "-" * 20)
 
-    def oneHotEncoding(board):
+    def oneHotEncoding(self, board):
         """
         Converts the 2048 grid state into a one-hot encoding representation of the board with 13 channels. Each tile corresponds to a one-hot vector where its value x will be 1 in the index log_2 x.
 
@@ -157,6 +157,12 @@ class Game2048Env(gym.Env):
                     hot_index = int(np.log2(tile)) + 1
                     one_hot[row][col][hot_index] = 1
         return one_hot
+    
+    def normalized_values(self, board, max_value=2048):
+        """
+        Normalize the board values by dividing by the maximum value.
+        """
+        return board / max_value
 
     def get_board(self):
         return self.__game.get_board()

@@ -2,7 +2,7 @@ import numpy as np
 
 
 class Game2048:
-    def __init__(self, board_size: int, invalid_move_warmup=16, invalid_move_threshold=0.1, penalty=-512, dynamic_obstacle_interval=5, dynamic_obstacle_value=1):
+    def __init__(self, board_size=4, invalid_move_warmup=16, invalid_move_threshold=0.1, penalty=-512, dynamic_obstacle_interval=5, dynamic_obstacle_value=1):
         """
         Initialize the 2048 game with dynamic obstacles.
 
@@ -37,9 +37,8 @@ class Game2048:
         self.__add_two_or_four()
         self.__add_two_or_four()
 
-# Methods for adding tiles
+    # Methods for adding tiles
 
-    # Adds standard tiles to play
     def __add_two_or_four(self):
         """Add tile with number two."""
 
@@ -59,6 +58,7 @@ class Game2048:
     # Adds dynamic obstacle tiles to play
     def __add_dynamic_obstacle(self):
         """Add a dynamic obstacle (-1) to a random empty position."""
+
         indexes = np.where(self.__board == 0)
         if len(indexes[0]) == 0:
             return
@@ -129,9 +129,92 @@ class Game2048:
         self.score = score
         return board
     
+    
+    def confirm_move(self):
+        """Finalize the move and add dynamic obstacles periodically."""
+        self.__total_count += 1
+        self.__total_score += self.__score
 
-   
-# Directional moves
+        if np.array_equal(self.__board, self.__temp_board):
+            self.__invalid_count += 1
+            self.__score = self.__penalty
+        else:
+            self.__board = self.__temp_board.copy()
+
+            # Ensure we never have more than 2 dynamic obstacles
+            if self.__total_count % 10 == 0 and self.getNumObstacles() == 0:
+                self.__add_dynamic_obstacle()
+            elif self.__total_count % 2 == 0 and self.getNumObstacles() == 1:
+                self.__add_dynamic_obstacle()
+            else:
+                self.__add_two_or_four()
+    
+    def verify_game_state(self):
+        """
+        Check if the game is over. The game ends when:
+        1. There are no empty tiles AND
+        2. No moves result in a valid state change.
+        """
+        # Check for empty spaces
+        if np.any(self.__board == 0):
+            return False, 0 
+
+        # Simulate all possible moves to check for validity
+        for move in range(4):
+            temp_board = self.__board.copy()
+            if self.simulate_move(temp_board, move):
+                return False, 0  
+
+        # No valid moves left
+        return True, self.__penalty
+
+    def is_game_over(self):
+        return self.verify_game_state()[0]
+    
+
+    def make_move(self, move):
+        """Make a move."""
+        self.__score = 0
+
+        if move == 0:
+            self.__up()
+        if move == 1:
+            self.__down()
+        if move == 2:
+            self.__right()
+        if move == 3:
+            self.__left()
+
+
+    def simulate_move(self, board, move):
+        """
+        Simulate a move and return whether it results in a state change.
+        """
+        temp = None
+        if move == 0:  # Up
+            temp = self.__cover_up(board)
+            temp = self.__merge(temp)
+            temp = self.__cover_up(temp)
+        elif move == 1:  # Down
+            temp = self.__reverse(board)
+            temp = self.__merge(temp)
+            temp = self.__cover_up(temp)
+            temp = self.__reverse(temp)
+        elif move == 2:  # Right
+            temp = self.__reverse(self.__transpose(board))
+            temp = self.__merge(temp)
+            temp = self.__cover_up(temp)
+            temp = self.__transpose(self.__reverse(temp))
+        elif move == 3:  # Left
+            temp = self.__transpose(board)
+            temp = self.__merge(temp)
+            temp = self.__cover_up(temp)
+            temp = self.__transpose(temp)
+
+        # Return whether the board changed
+        return not np.array_equal(board, temp)
+    
+    # Directional moves
     def __up(self):
 
         temp = self.__cover_up(self.__board)
@@ -163,121 +246,6 @@ class Game2048:
         temp = self.__transpose(temp)
         self.__temp_board = temp
 
-    def compute_smoothness_penalty(self):
-        """
-        Compute the smoothness penalty of the board.
-        Smoothness is measured as the sum of the absolute differences between
-        the values of adjacent tiles (horizontally and vertically).
-        
-        Args:
-            board (np.ndarray): 2D array representing the 2048 board.
-        
-        Returns:
-            float: Smoothness penalty (lower is smoother).
-        """
-        smoothness = 0
-        
-        # Iterate through each tile
-        for i in range(self.__board.shape[0]):
-            for j in range(self.__board.shape[1]):
-                if self.__board[i, j] != 0:  # Consider only non-zero tiles
-                    current_value = self.__board[i, j]
-                    
-                    # Check horizontal neighbor (right)
-                    if j + 1 < self.__board.shape[1] and self.__board[i, j + 1] != 0:
-                        smoothness += abs(current_value - self.__board[i, j + 1])
-                    
-                    # Check vertical neighbor (down)
-                    if i + 1 < self.__board.shape[0] and self.__board[i + 1, j] != 0:
-                        smoothness += abs(current_value - self.__board[i + 1, j])
-        
-        return smoothness
-    
-    def confirm_move(self):
-        """Finalize the move and add dynamic obstacles periodically."""
-        self.__total_count += 1
-        self.__total_score += self.__score
-
-        if np.array_equal(self.__board, self.__temp_board):
-            self.__invalid_count += 1
-            self.__score = self.__penalty
-        else:
-            self.__board = self.__temp_board.copy()
-            self.__add_two_or_four()
-
-            # Add dynamic obstacles based on the specified conditions
-            if self.__total_count % 10 == 0:
-                self.__add_dynamic_obstacle()
-            elif self.__total_count % 5 == 0 and self.getNumObstacles() == 0:
-                self.__add_dynamic_obstacle()
-
-            # # Add dynamic obstacles every few steps
-            # if self.__total_count % 2 == 0 and self.__total_count % self.__dynamic_obstacle_interval == 0:
-            #     self.__add_dynamic_obstacle()
-    
-    def verify_game_state(self):
-        """
-        Check if the game is over. The game ends when:
-        1. There are no empty tiles AND
-        2. No moves result in a valid state change.
-        """
-        # Check for empty spaces
-        if np.any(self.__board == 0):
-            return False, 0 
-
-        # Simulate all possible moves to check for validity
-        for move in range(4):
-            temp_board = self.__board.copy()
-            if self.__simulate_move(temp_board, move):
-                return False, 0  
-
-        # No valid moves left
-        return True, self.__penalty
-    
-
-
-    def make_move(self, move):
-        """Make a move."""
-        self.__score = 0
-
-        if move == 0:
-            self.__up()
-        if move == 1:
-            self.__down()
-        if move == 2:
-            self.__right()
-        if move == 3:
-            self.__left()
-
-
-    def __simulate_move(self, board, move):
-        """
-        Simulate a move and return whether it results in a state change.
-        """
-        temp = None
-        if move == 0:  # Up
-            temp = self.__cover_up(board)
-            temp = self.__merge(temp)
-            temp = self.__cover_up(temp)
-        elif move == 1:  # Down
-            temp = self.__reverse(board)
-            temp = self.__merge(temp)
-            temp = self.__cover_up(temp)
-            temp = self.__reverse(temp)
-        elif move == 2:  # Right
-            temp = self.__reverse(self.__transpose(board))
-            temp = self.__merge(temp)
-            temp = self.__cover_up(temp)
-            temp = self.__transpose(self.__reverse(temp))
-        elif move == 3:  # Left
-            temp = self.__transpose(board)
-            temp = self.__merge(temp)
-            temp = self.__cover_up(temp)
-            temp = self.__transpose(temp)
-
-        # Return whether the board changed
-        return not np.array_equal(board, temp)
-    
     # Scoring and board state methods
     def get_move_score(self):
         """Get the last score move."""
@@ -303,12 +271,12 @@ class Game2048:
         return np.amax(self.__board)
     
     def getNumObstacles(self):
-        return np.sum(self.__board == 1)
+        return self.__num_obstacles
+        # return np.sum(self.__board == 1)
     
     def getNumEmptyTiles(self):
         return np.sum(self.__board == 0)
     
-
     def make_move(self, move):
         """Make a move."""
         self.__score = 0
@@ -323,7 +291,7 @@ class Game2048:
             self.__left()
 
 
-    def __simulate_move(self, board, move):
+    def simulate_move(self, board, move):
         """
         Simulate a move and return whether it results in a state change.
         """

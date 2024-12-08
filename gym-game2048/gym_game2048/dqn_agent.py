@@ -15,7 +15,7 @@ BATCH_SIZE = 32 # 64. No 32 is fine
 TARGET_UPDATE = 2 # change every 10
 MAX_BUFFER_SIZE = 10000
  
-class DQNAgent:
+class dqn_agent:
   def __init__(self, env, main_model, target_model, replay_buffer):
     self.env = env
     self.main_model = main_model

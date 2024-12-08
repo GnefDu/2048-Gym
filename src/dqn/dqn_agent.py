@@ -25,6 +25,7 @@ class dqn_agent:
   def select_action(self, state, epsilon):
     if np.random.rand() < epsilon:
       return np.random.choice(NUM_ACTIONS)
+    
     new_state = np.expand_dims(state, axis=0) 
     q_values = self.main_model.predict(new_state, verbose=0)
     return np.argmax(q_values[0])
@@ -42,8 +43,6 @@ class dqn_agent:
     rewards = np.array(rewards)
     dones = np.array(dones)
 
-    # states = np.array([self.env.normalize_log_values(s) for s in states])
-    # next_states = np.array([self.env.normalize_log_values(s) for s in next_states])
     q_values = self.main_model.predict(states, verbose=0)
     next_q_values = self.target_model.predict(next_states, verbose=0)
 
@@ -53,9 +52,7 @@ class dqn_agent:
       else:
         q_values[i][actions[i]] = rewards[i] + GAMMA * np.max(next_q_values[i])
 
-    # adjust number of epochs
-    self.main_model.fit(states, q_values, verbose=0, epochs=1, batch_size=BATCH_SIZE)
+    self.main_model.fit(states, q_values, verbose=0, epochs=2, batch_size=BATCH_SIZE)
 
   def update_target_model(self):
     self.target_model.set_weights(self.main_model.get_weights())
-  

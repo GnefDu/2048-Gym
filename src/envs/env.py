@@ -61,14 +61,10 @@ class Game2048Env(gym.Env):
         before_move = self.__game.get_board().copy()
         self.__game.make_move(action)
         self.__game.confirm_move()
-        self.state = self.normalize_log_values(self.__game.get_board())
+        self.state = self.normalized_board(self.__game.get_board())
         
         # Verify the game state and update reward and penalties
         self.__done, penalty = self.__game.verify_game_state()
-
-        # reward = self.__game.get_move_score() + penalty
-        # if self.__done:
-        #     reward += self.__game.get_total_score()
 
         self.__n_iter = self.__n_iter + 1 
         after_move = self.__game.get_board()
@@ -94,48 +90,28 @@ class Game2048Env(gym.Env):
         self.state = self.__game.get_board()
         return self.state
 
-
     def calculate_reward(self, move_score, done, penalty):
-        reward = 0
-
-        # # Reward for score increment (normalize to [-1, 1] based on max score delta)
-        # max_score_delta = 2048  # Adjust as needed
-        # reward += np.clip((new_board.score - board.score) / max_score_delta, -1, 1)
+        reward = 0       
         
         # Reward for tile merges (normalize to [-1, 1] based on max merge value)
         max_merge_value = 4096  # Adjust as needed
         reward += np.clip(0.1 * move_score/ max_merge_value, -1, 1)
         
         # Bonus for empty tiles (normalize based on max possible tiles)
-        max_empty_tiles = 16  # For a 4x4 grid
+        max_empty_tiles = 14  # For a 4x4 grid
         reward += np.clip(2 * self.__game.getNumEmptyTiles() / max_empty_tiles, -1, 1)
         
-        # Penalty for lack of smoothness (assume max penalty is known)
-        max_smoothness_penalty = 100  # Empirical or estimated value
-        reward -= np.clip(self.__game.compute_smoothness_penalty() / max_smoothness_penalty, -1, 1)
-        
-        # Game over penalty
+        # Game over and invalid move penalty 
         if done or penalty < 0:
             reward -= 1  # Already scaled appropriately
 
         return reward
 
-    def render(self, mode="human"):
-        """Render the current board state in a human-readable format."""
-        # Obtain the board from the game
-        board = self.__game.get_board()
-        board_display = "\n".join(["\t".join(map(str, row)) for row in board])
-        
-        # Display the current board state
-        print("Current Board State:\n")
-        print(board_display)
-        print("\n" + "-" * 20)
-
     def getLogEncoding(self, board):
         new_board = np.where(board > 0, (np.log2(board))+1, 0).astype(int)
         return new_board
 
-    def normalize_log_values(self, board):
+    def normalized_board(self, board):
         new_board = self.getLogEncoding(board)
         new_board = new_board / 13 # 12 because we have the extra value of 1 for the dynamic obstacle
         return new_board
@@ -163,12 +139,17 @@ class Game2048Env(gym.Env):
                     one_hot[row][col][hot_index] = 1
         return one_hot
     
-    def normalized_values(self, board, max_value=2048):
-        """
-        Normalize the board values by dividing by the maximum value.
-        """
-        return board / max_value
-
     def get_board(self):
         return self.__game.get_board()
+    
+    def render(self, mode="human"):
+        """Render the current board state in a human-readable format."""
+        # Obtain the board from the game
+        board = self.__game.get_board()
+        board_display = "\n".join(["\t".join(map(str, row)) for row in board])
+        
+        # Display the current board state
+        print("Current Board State:\n")
+        print(board_display)
+        print("\n" + "-" * 20)
 

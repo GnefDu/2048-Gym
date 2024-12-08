@@ -23,33 +23,34 @@ class ReplayBuffer:
 
   
 # Hyperparameters
-NUM_EPISODES = 1000 # will increase
+NUM_EPISODES = 100 # will increase
 GAMMA = 0.99
 EPSILON = 1.0 # initial epsilon value
 EPSILON_MIN = 0.01
-# EPSILON_DECAY = 0.995 # 0.995, I'm gonna drop this so that it decays faster. It needs to be a little greedier
 EPSILON_DECAY = 0.995
-BATCH_SIZE = 32 # 64
-TARGET_UPDATE = 50 # change every 10
-MAX_BUFFER_SIZE = 10000
-TRAIN_FREQ = 4
-
-max_tiles = []
-episode_rewards = []
-avg_tiles = []
+BATCH_SIZE = 32
+TARGET_UPDATE = 10 # change every 10
+MAX_BUFFER_SIZE = 5000
+TRAIN_FREQ = 2
 
 # use a target and a main model
 def training_loop():
   max_steps = 500 # 500
   env = Game2048Env(board_size=4)
+
   main_model = dqn_model().build_model3()
   target_model = dqn_model().build_model3()
 
   replay_buffer = ReplayBuffer(MAX_BUFFER_SIZE)
   agent = dqn_agent(env, main_model, target_model, replay_buffer)
   epsilon = EPSILON
-  maxTile = 0
-  max_scores = []
+
+  # use an object
+  max_tiles = []
+  episode_rewards = []
+  avg_tiles = []
+  epsilons = []
+
   for episode in range(NUM_EPISODES):
     state = env.reset()
     done = False
@@ -67,21 +68,29 @@ def training_loop():
 
       state = next_state
       total_reward += reward
-      ep_max = max(ep_max, np.max(state))
-      maxTile = max(ep_max, maxTile)
+      board = env.get_board()
+      ep_max = max(ep_max, np.max(board))
 
       if done:
         break
+
+    max_tiles.append(ep_max)
+    avg_tiles.append(np.mean(state))
+    epsilons.append(epsilon)
+    episode_rewards.append(total_reward)
 
     if episode % TARGET_UPDATE == 0: # update target network periodically
       agent.update_target_model()
 
     epsilon = max(EPSILON_MIN, epsilon * EPSILON_DECAY) # decay epsilon
-    max_scores.append(ep_max*2048)
+    max_tiles.append(ep_max)
     print(env.get_board())
     print(f"Episode {episode}, Total Reward: {total_reward}, Epsilon: {epsilon}")
     print(f"Max Tile reached: {ep_max}")
-  print(max_scores)
+  print(max_tiles)
+  print(avg_tiles)
+  print(epsilons)
+  plot_scores(max_tiles)
 
 def print_board(state):
     state = state * 13

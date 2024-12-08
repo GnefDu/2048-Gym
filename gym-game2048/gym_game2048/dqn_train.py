@@ -2,8 +2,8 @@ import numpy as np
 from collections import deque
 import random
 from envs.env import Game2048Env
-import dqn_agent
-import dqn_model
+from dqn_agent import dqn_agent
+from dqn_model import dqn_model
 
 
 # CONSTANTS
@@ -67,8 +67,9 @@ def training_loop():
       total_reward += reward
       ep_max = max(ep_max, np.max(state))
       maxTile = max(ep_max, maxTile)
+      print_board(state)
 
-      print(state)
+
       if done:
         break
 
@@ -77,10 +78,14 @@ def training_loop():
 
     epsilon = max(EPSILON_MIN, epsilon * EPSILON_DECAY) # decay epsilon
     max_scores.append(ep_max)
-    print(state)
+    print_board(state)
     print(f"Episode {episode}, Total Reward: {total_reward}, Epsilon: {epsilon}")
     print(f"Max Tile reached: {ep_max}")
   print(max_scores)
+
+def print_board(state):
+    print(int(state * 2048))
+  
 
 def main():
   training_loop()
