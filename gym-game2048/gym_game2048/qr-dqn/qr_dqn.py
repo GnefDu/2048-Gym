@@ -11,24 +11,36 @@ class QRDQNNetwork(nn.Module):
         super(QRDQNNetwork, self).__init__()
         self.n_quantiles = n_quantiles
         
-        # Feature extraction layers
+        # Deeper network with larger layers
         self.features = nn.Sequential(
-            nn.Linear(state_size, hidden_size),
+            nn.Linear(state_size, 512),
             nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
             nn.ReLU()
         )
         
-        # Quantile layers - one for each action
-        self.quantiles = nn.Linear(hidden_size, action_size * n_quantiles)
+        # Separate advantage and value streams (Dueling DQN architecture)
+        self.advantage = nn.Linear(256, action_size * n_quantiles)
+        self.value = nn.Linear(256, n_quantiles)
         
     def forward(self, state):
         batch_size = state.size(0)
         features = self.features(state)
-        quantiles = self.quantiles(features)
         
-        # Reshape to (batch_size, action_size, n_quantiles)
-        return quantiles.view(batch_size, -1, self.n_quantiles)
+        advantage = self.advantage(features)
+        value = self.value(features)
+        
+        # Reshape
+        advantage = advantage.view(batch_size, -1, self.n_quantiles)
+        value = value.view(batch_size, 1, self.n_quantiles)
+        
+        # Combine value and advantage
+        quantiles = value + (advantage - advantage.mean(dim=1, keepdim=True))
+        return quantiles
 
 class ReplayBuffer:
     def __init__(self, capacity=100000):
@@ -95,8 +107,8 @@ class QRDQN:
         if len(self.memory) < self.batch_size:
             return
         
-        # Sample from memory
-        states, actions, rewards, next_states, dones = self.memory.sample(self.batch_size)
+        # Sample from memory with priorities
+        states, actions, rewards, next_states, dones, indices, weights = self.memory.sample(self.batch_size)
         
         # Convert to tensors
         states = torch.FloatTensor(states).to(self.device)
@@ -104,6 +116,7 @@ class QRDQN:
         rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(next_states).to(self.device)
         dones = torch.FloatTensor(dones).to(self.device)
+        weights = torch.FloatTensor(weights).to(self.device)
         
         # Get current Q values
         current_quantiles = self.policy_net(states)
@@ -115,6 +128,9 @@ class QRDQN:
             best_actions = next_quantiles.mean(dim=2).max(1)[1]
             next_quantiles = next_quantiles[range(self.batch_size), best_actions]
             target_quantiles = rewards.unsqueeze(1) + self.gamma * (1 - dones.unsqueeze(1)) * next_quantiles
+        
+        # Compute TD errors for prioritized replay
+        td_errors = torch.abs(current_quantiles.mean(dim=1) - target_quantiles.mean(dim=1)).detach().cpu().numpy()
         
         # Compute loss
         loss = self.quantile_huber_loss(current_quantiles, target_quantiles)
@@ -129,4 +145,26 @@ class QRDQN:
         for target_param, policy_param in zip(self.target_net.parameters(), self.policy_net.parameters()):
             target_param.data.copy_(self.tau * policy_param.data + (1 - self.tau) * target_param.data)
         
+        # Update priorities in memory
+        self.memory.update_priorities(indices, td_errors + 1e-6)  # Add small constant to prevent zero priorities
+        
         return loss.item()
+    
+
+    def preprocess_state(self, state):
+        """Convert state to better features"""
+        # Log scale for tile values
+        state = np.log2(state + 1)
+        
+        # Add positional features
+        empty_cells = (state == 0).astype(float)
+        max_tile = np.max(state)
+        
+        # Normalize
+        state = state / 11.0  # log2(2048) = 11
+        
+        return np.concatenate([
+            state.flatten(),
+            empty_cells.flatten(),
+            [max_tile / 11.0]
+    ])
