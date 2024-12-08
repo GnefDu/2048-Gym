@@ -1,10 +1,8 @@
 import gym
 import numpy as np
-import sys
 from gym.utils import seeding
 from gym import spaces
-from game_2048 import Game2048
-
+from envs.game_2048 import Game2048
 
 class Game2048Env(gym.Env):
 
@@ -48,12 +46,10 @@ class Game2048Env(gym.Env):
     def step(self, action):
         """
         Execute an action.
-
         Parameters
         ----------
         action : int
             Action selected by the model.
-
         ----------
         Returns the next state, reward, termination status, and game info.
         """
@@ -65,7 +61,7 @@ class Game2048Env(gym.Env):
         before_move = self.__game.get_board().copy()
         self.__game.make_move(action)
         self.__game.confirm_move()
-        self.state = self.normalized_values(self.__game.get_board())
+        self.state = self.normalize_log_values(self.__game.get_board())
         
         # Verify the game state and update reward and penalties
         self.__done, penalty = self.__game.verify_game_state()
@@ -134,6 +130,15 @@ class Game2048Env(gym.Env):
         print("Current Board State:\n")
         print(board_display)
         print("\n" + "-" * 20)
+
+    def getLogEncoding(self, board):
+        new_board = np.where(board > 0, (np.log2(board))+1, 0).astype(int)
+        return new_board
+
+    def normalize_log_values(self, board):
+        new_board = self.getLogEncoding(board)
+        new_board = new_board / 13 # 12 because we have the extra value of 1 for the dynamic obstacle
+        return new_board
 
     def oneHotEncoding(self, board):
         """

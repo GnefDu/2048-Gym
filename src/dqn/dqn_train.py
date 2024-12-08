@@ -1,19 +1,13 @@
 import numpy as np
 from collections import deque
 import random
+import matplotlib.pyplot as plt
 from dqn_agent import dqn_agent
 from dqn_model import dqn_model
-import os
 import sys
 sys.path.append('../src')
 from envs.env import Game2048Env
 
-
-
-# CONSTANTS
-NUM_ACTIONS = 4
-LEARNING_RATE = 0.0001 # Could it be too small?? No, the learning rate has to be small for the model to learn properly for this kind of task
-# LEARNING_RATE = 0.00001
 
 class ReplayBuffer:
   def __init__(self, max_size):
@@ -29,17 +23,20 @@ class ReplayBuffer:
 
   
 # Hyperparameters
-NUM_EPISODES = 10 # will increase
+NUM_EPISODES = 1000 # will increase
 GAMMA = 0.99
 EPSILON = 1.0 # initial epsilon value
 EPSILON_MIN = 0.01
 # EPSILON_DECAY = 0.995 # 0.995, I'm gonna drop this so that it decays faster. It needs to be a little greedier
-EPSILON_DECAY = 0.5
+EPSILON_DECAY = 0.995
 BATCH_SIZE = 32 # 64
-TARGET_UPDATE = 2 # change every 10
+TARGET_UPDATE = 50 # change every 10
 MAX_BUFFER_SIZE = 10000
+TRAIN_FREQ = 4
 
-
+max_tiles = []
+episode_rewards = []
+avg_tiles = []
 
 # use a target and a main model
 def training_loop():
@@ -65,14 +62,13 @@ def training_loop():
       replay_buffer.add((state, action, reward, next_state, done)) # store experience in replay buffer as a tuple of state, action, reward, next_state, and done flag
       
       # train DQN
-      agent.train_step() # only predicts and updates q values if replay buffer has enough experiences
+      if step % TRAIN_FREQ == 0:
+        agent.train_step() # only predicts and updates q values if replay buffer has enough experiences
 
       state = next_state
       total_reward += reward
       ep_max = max(ep_max, np.max(state))
       maxTile = max(ep_max, maxTile)
-      print_board(state)
-
 
       if done:
         break
@@ -82,16 +78,27 @@ def training_loop():
 
     epsilon = max(EPSILON_MIN, epsilon * EPSILON_DECAY) # decay epsilon
     max_scores.append(ep_max*2048)
-    print_board(state)
+    print(env.get_board())
     print(f"Episode {episode}, Total Reward: {total_reward}, Epsilon: {epsilon}")
     print(f"Max Tile reached: {ep_max}")
   print(max_scores)
 
 def print_board(state):
-    state = state * 2048
+    state = state * 13
+    state = np.power(state, 2)
     state = state.astype(int)
     print(state)
   
+def plot_scores(scores):
+  plt.figure(figsize=(12, 6))
+  plt.plot(scores, label="Max Tile Achieved")
+  plt.xlabel("Episodes")
+  plt.ylabel("Max Tile")
+  plt.title("Max Tile Achieved During Training")
+  plt.legend()
+  plt.grid()
+  plt.show()
+
 
 def main():
   training_loop()

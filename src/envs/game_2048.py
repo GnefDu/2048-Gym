@@ -205,9 +205,15 @@ class Game2048:
             self.__board = self.__temp_board.copy()
             self.__add_two_or_four()
 
-            # Add dynamic obstacles every few steps
-            if self.__total_count % self.__dynamic_obstacle_interval == 0:
+            # Add dynamic obstacles based on the specified conditions
+            if self.__total_count % 10 == 0:
                 self.__add_dynamic_obstacle()
+            elif self.__total_count % 5 == 0 and self.getNumObstacles() == 0:
+                self.__add_dynamic_obstacle()
+
+            # # Add dynamic obstacles every few steps
+            # if self.__total_count % 2 == 0 and self.__total_count % self.__dynamic_obstacle_interval == 0:
+            #     self.__add_dynamic_obstacle()
     
     def verify_game_state(self):
         """

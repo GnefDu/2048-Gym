@@ -10,7 +10,7 @@ NUM_EPISODES = 10 # will increase
 GAMMA = 0.99
 EPSILON = 1.0 # initial epsilon value
 EPSILON_MIN = 0.01
-EPSILON_DECAY = 0.5 # EPSILON_DECAY = 0.995 # 0.995, I'm gonna drop this so that it decays faster. It needs to be a little greedier
+EPSILON_DECAY = 0.995 # EPSILON_DECAY = 0.995 # 0.995, I'm gonna drop this so that it decays faster. It needs to be a little greedier
 BATCH_SIZE = 32 # 64. No 32 is fine
 TARGET_UPDATE = 2 # change every 10
 MAX_BUFFER_SIZE = 10000
@@ -25,7 +25,7 @@ class dqn_agent:
   def select_action(self, state, epsilon):
     if np.random.rand() < epsilon:
       return np.random.choice(NUM_ACTIONS)
-    new_state = np.expand_dims(self.env.oneHotEncoding(state), axis=0) # add a new axis corresponding to the batch size of 1. verbose means silent mode.
+    new_state = np.expand_dims(state, axis=0) 
     q_values = self.main_model.predict(new_state, verbose=0)
     return np.argmax(q_values[0])
 
@@ -42,8 +42,8 @@ class dqn_agent:
     rewards = np.array(rewards)
     dones = np.array(dones)
 
-    states = np.array([self.env.oneHotEncoding(s) for s in states])
-    next_states = np.array([self.env.oneHotEncoding(s) for s in next_states])
+    # states = np.array([self.env.normalize_log_values(s) for s in states])
+    # next_states = np.array([self.env.normalize_log_values(s) for s in next_states])
     q_values = self.main_model.predict(states, verbose=0)
     next_q_values = self.target_model.predict(next_states, verbose=0)
 
@@ -58,3 +58,4 @@ class dqn_agent:
 
   def update_target_model(self):
     self.target_model.set_weights(self.main_model.get_weights())
+  

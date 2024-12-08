@@ -1,15 +1,15 @@
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Input, Dense, Dropout, Activation, Flatten, Conv2D, MaxPooling2D, BatchNormalization
+from tensorflow.keras.optimizers import Adam
 import numpy as np
 
 class dqn_model:
   NUM_ACTIONS = 4
   LEARNING_RATE = 0.0001
-  def __init__(self, learning_rate=0.0001, size=(4,4)):
+  def __init__(self, size=(4,4)):
     self.size=size
 
-# this is a poor model, replace it.
   def build_model(self):
     # define convolutional layers
     input_shape = (self.size[0], self.size[1], 13)
@@ -27,8 +27,6 @@ class dqn_model:
 
     self.model.compile(loss='mse', optimizer='adam')
     return self.model
-    # a different kind of model uses the following values:
-    # 2 depths of convolutional layers with depths 128 for the first and 256 for the second
 
   def build_model2(self):
     input_shape = (self.size[0], self.size[1], 13)
@@ -52,24 +50,26 @@ class dqn_model:
     output = Dense(self.NUM_ACTIONS, activation='linear')(dense2)
     self.model2 = Model(inputs=input_layer, outputs=output)
 
-    self.model2.compile(loss='mse', optimizer=tf.keras.optimizers.ExponentialDecay(float(LEARNING_RATE, 50, 0.90, staircase=True)),
+    self.model2.compile(loss='mse', optimizer=tf.keras.optimizers.ExponentialDecay(float(0.001, 50, 0.90, staircase=True)),
                         metrics=[tf.keras.metrics.MeanAbsoluteError()])
     return self.model2
 
   def build_model3(self):
-    input = Input(shape=(self.size[0], self.size[1], 13))
+    input = Input(shape=(self.size[0], self.size[1], 1))
     model = Sequential([
-      Input(shape=(self.size[0], self.size[1], 13) ),
-      Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='valid'),
-      Conv2D(filters=256, kernel_size=(2, 2), activation='relu', padding='same'),
+      Input(shape=(self.size[0], self.size[1], 1) ),
+      Conv2D(filters=64, kernel_size=(3, 3), activation='relu', padding='valid'),
+      BatchNormalization(),
+      Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same'),
+      MaxPooling2D(pool_size=(2, 2)),
       Flatten(),
+      Dense(512, activation='relu'),
+      Dropout(0.3),
       Dense(256, activation='relu'),
-      Dropout(0.2),
-      Dense(128, activation='relu'),
       Dropout(0.2),
       Dense(self.NUM_ACTIONS, activation='linear')
     ])
-    model.compile(loss='mse',metrics=['accuracy'], optimizer='adam') # try stochastic gradient descent as well for the optimizer
+    model.compile(loss='mse',metrics=['accuracy'], optimizer=Adam(learning_rate=self.LEARNING_RATE)) # try stochastic gradient descent as well for the optimizer
     return model
 
   def getLogEncoding(self, board):
@@ -78,13 +78,3 @@ class dqn_model:
 
   def getModel(self):
     return self.model3
-  
-board = np.array([
-  [1, 0, 8, 16],
-  [32, 64, 128, 256],
-  [512, 1024, 2048, 2],
-  [4, 8, 16, 32]
-])
-
-model = dqn_model()
-print(model.getLogEncoding(board))
