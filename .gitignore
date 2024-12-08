@@ -115,3 +115,4 @@ model/tensorboards
 model/tmp
 .tags
 __pycache__
+.DS_Store
