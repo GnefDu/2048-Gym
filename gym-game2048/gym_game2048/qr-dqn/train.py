@@ -133,155 +133,69 @@ def plot_training_results(episode_rewards, max_tiles, episode_num, save_dir='tra
     plt.close()
 
 
-def train():
-    # Initialize environment and agent
-    env = Game2048Env(board_size=4, penalty=-32)
-    state_size = 16
-    action_size = 4
-
-    target_update_freq = 1000  # Update target network every 1000 steps
-    total_steps = 0
-    
-    # Training parameters
-    batch_size = 256
-    learning_rate = 0.001
-    memory_size = 50000
-    gamma = 0.99  # Discount factor
-    tau = 0.005  # Soft update parameter
-    
-    # Initialize agent with parameters
+def train_quick():
+    env = Game2048Env(board_size=4)
     agent = QRDQN(
-        state_size=37,  # Increased for additional features
+        state_size=37,  # Updated to match the preprocessed state size
         action_size=4,
-        memory_size=memory_size,
-        batch_size=batch_size,
-        learning_rate=learning_rate,
-        gamma=gamma,
-        tau=tau
+        memory_size=10000,
+        batch_size=64
     )
-
-    # Add prioritized experience replay
-    agent.memory = PrioritizedReplayBuffer(memory_size)
-
-    max_reward_ever = float('-inf')
-    max_reward_episode = 0
     
-    # Training loop parameters
-    episodes = 500  # Increased episodes
-    max_steps = 1000
-    epsilon_start = 1.0
-    epsilon_end = 0.01
-    epsilon_decay = 0.991  # Slower decay
+    max_steps_per_episode = 200
+    best_game_score = float('-inf')
+    best_max_tile = 0
     
-    # Tracking metrics
-    episode_rewards = []
-    max_tiles = []
-    epsilon = epsilon_start
-    try:
-        for episode in tqdm(range(episodes)):
-            state = env.reset()
-            episode_reward = 0.0
-            max_tile = 0
-            
-            for step in range(max_steps):
-
-                state_2d = state.reshape(4, 4)
-                processed_state = agent.preprocess_state(state_2d)
-
-                # Use dynamic epsilon
-                current_epsilon = agent.get_dynamic_epsilon(max_tile, epsilon)
-                action = agent.select_action(processed_state, current_epsilon)
-                
-                next_state, reward, done, info = env.step(action)
-                
-                # Enhanced reward shaping
-                auxiliary_reward = calculate_auxiliary_reward(state_2d, reward, max_tile)
-                
-                total_reward = reward + auxiliary_reward
-
-                # Preprocess next state
-                next_state_2d = next_state.reshape(4, 4)
-                processed_next_state = agent.preprocess_state(next_state_2d)
-
-                priority = abs(total_reward) + 1e-6  # Priority based on reward magnitude
-                agent.memory.push(processed_state, action, total_reward, processed_next_state, done, priority)
-                
-                loss = agent.train_step()
-                total_steps += 1
-
-                # Update target network periodically
-                if total_steps % target_update_freq == 0:
-                    agent.target_net.load_state_dict(agent.policy_net.state_dict())
-
-                state = next_state
-                episode_reward += total_reward
-                max_tile = max(max_tile, np.max(state))
-                if done:
-                    break
-            
-            if episode_reward > max_reward_ever:
-                max_reward_ever = episode_reward
-                max_reward_episode = episode + 1
-                # Save best model
-                torch.save({
-                    'model_state_dict': agent.policy_net.state_dict(),
-                    'optimizer_state_dict': agent.optimizer.state_dict(),
-                    'episode': episode,
-                    'reward': max_reward_ever,
-                }, 'best_model.pth')
-            
-            epsilon = max(epsilon_end, epsilon * epsilon_decay)
-            episode_rewards.append(float(episode_reward))
-            max_tiles.append(float(max_tile))
-
-            # Plot every 250 episodes instead of 500
-            if (episode + 1) % 250 == 0:  # Changed from 500 to 250
-                plot_training_results(episode_rewards, max_tiles, episode + 1)
-                np.save(f'episode_rewards_{episode+1}.npy', episode_rewards)
-                np.save(f'max_tiles_{episode+1}.npy', max_tiles)
-                        
-            # Plot every 500 episodes
-            # Save more frequently
-            if (episode + 1) % 100 == 0:  # Every 100 episodes
-                torch.save({
-                    'model_state_dict': agent.policy_net.state_dict(),
-                    'optimizer_state_dict': agent.optimizer.state_dict(),
-                    'episode': episode,
-                }, f'qrdqn_checkpoint_{episode+1}.pth')
-            
-            # Print stats every 100 episodes
-            if (episode + 1) % 100 == 0:
-                avg_reward = np.mean(episode_rewards[-100:])
-                avg_max_tile = np.mean(max_tiles[-100:])
-                print(f"\nEpisode {episode + 1}")
-                print(f"Average Reward: {avg_reward:.2f}")
-                print(f"Average Max Tile: {avg_max_tile:.2f}")
-                print(f"Epsilon: {epsilon:.3f}")
-                print(f"Best Reward Ever: {max_reward_ever:.2f} (Episode {max_reward_episode})")
-                print("------------------------")
-                env.render()
+    for episode in range(10):
+        state = env.reset()
+        game_score = 0
+        total_reward = 0
+        max_tile = 0
         
-                
-    except KeyboardInterrupt:
-        print("\nTraining interrupted! Saving final plot and data...")
-    finally:
-        # Always create final plot
-        plot_training_results(episode_rewards, max_tiles, episode + 1)
+        for step in range(max_steps_per_episode):
+            current_max_tile = np.max(state)
+            max_tile = max(max_tile, current_max_tile)
+            
+            epsilon = agent.get_dynamic_epsilon(max_tile, 0.3)
+            
+            # No need to preprocess here as select_action handles it
+            action = agent.select_action(state, epsilon)
+            next_state, reward, done, info = env.step(action)
+
+            # Update max_tile after action too
+            current_max_tile = np.max(next_state)
+            max_tile = max(max_tile, current_max_tile)
+            
+            # Store transition with preprocessed states
+            agent.memory.push(
+                state,  # Original state, will be preprocessed in train_step
+                action,
+                reward,
+                next_state,  # Original next_state, will be preprocessed in train_step
+                done
+            )
+            
+            loss = agent.train_step()
+            
+            if step % 10 == 0:
+                agent.target_net.load_state_dict(agent.policy_net.state_dict())
+            
+            state = next_state
+            total_reward += reward
+            game_score = info['total_score']  # Get actual game score
+            
+            if done:
+                break
         
-        # Save final metrics
-        np.save('final_episode_rewards.npy', episode_rewards)
-        np.save('final_max_tiles.npy', max_tiles)
+        best_game_score = max(best_game_score, game_score)
+        best_max_tile = max(best_max_tile, max_tile)
         
-        # Save final model
-        torch.save({
-            'model_state_dict': agent.policy_net.state_dict(),
-            'optimizer_state_dict': agent.optimizer.state_dict(),
-            'episode': episode,
-            'episode_rewards': episode_rewards,
-            'max_tiles': max_tiles,
-        }, 'final_model.pth')
-        
-        print("\nFinal plots and data saved!")
+        print(f"Episode {episode + 1}/10")
+        print(f"Game Score: {game_score}")
+        print(f"Max Tile: {max_tile}")
+        print(f"Best Game Score So Far: {best_game_score}")
+        print(f"Best Max Tile So Far: {best_max_tile}")
+        print("-" * 50)
 
 if __name__ == "__main__":
-    train()
+    train_quick()
