@@ -60,7 +60,8 @@ class ReplayBuffer:
 
 class QRDQN:
     def __init__(self, state_size, action_size, memory_size=100000, batch_size=128, 
-                 learning_rate=0.0001, device="cuda" if torch.cuda.is_available() else "cpu"):
+                 learning_rate=0.0001, gamma=0.99, tau=0.005, 
+                 device="cuda" if torch.cuda.is_available() else "cpu"):
         self.state_size = state_size
         self.action_size = action_size
         self.device = device
@@ -152,19 +153,44 @@ class QRDQN:
     
 
     def preprocess_state(self, state):
-        """Convert state to better features"""
+        """Enhanced state preprocessing with more strategic features"""
         # Log scale for tile values
         state = np.log2(state + 1)
         
-        # Add positional features
+        # Calculate strategic features
         empty_cells = (state == 0).astype(float)
         max_tile = np.max(state)
         
-        # Normalize
-        state = state / 11.0  # log2(2048) = 11
+        # Monotonicity features (reward patterns that increase/decrease)
+        monotonic_lr = np.sum([state[i,j] >= state[i,j+1] for i in range(4) for j in range(3)])
+        monotonic_ud = np.sum([state[i,j] >= state[i+1,j] for i in range(3) for j in range(4)])
+        
+        # Corner preference (higher values in corners are good)
+        corners = np.array([state[0,0], state[0,3], state[3,0], state[3,3]])
+        corner_weight = np.sum(corners) / (np.sum(state) + 1e-6)
+        
+        # Merge possibilities
+        merge_possible = np.sum([state[i,j] == state[i,j+1] for i in range(4) for j in range(3)] +
+                            [state[i,j] == state[i+1,j] for i in range(3) for j in range(4)])
         
         return np.concatenate([
-            state.flatten(),
+            state.flatten() / 11.0,  # Normalized board
             empty_cells.flatten(),
-            [max_tile / 11.0]
-    ])
+            [max_tile / 11.0],
+            [monotonic_lr / 12.0],
+            [monotonic_ud / 12.0],
+            [corner_weight],
+            [merge_possible / 24.0]
+        ])
+
+    def get_dynamic_epsilon(self, max_tile, base_epsilon):
+        """More aggressive exploration reduction for higher tiles"""
+        if max_tile >= 256:
+            return max(0.01, base_epsilon * 0.1)  # Very low exploration
+        elif max_tile >= 128:
+            return max(0.03, base_epsilon * 0.3)
+        elif max_tile >= 64:
+            return max(0.05, base_epsilon * 0.5)
+        elif max_tile >= 32:
+            return max(0.1, base_epsilon * 0.7)
+        return base_epsilon

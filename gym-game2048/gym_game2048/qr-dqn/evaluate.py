@@ -10,11 +10,11 @@ def quick_evaluate(model_path, num_episodes):
     """Enhanced evaluation function with robust error handling"""
     env = Game2048Env(board_size=4, penalty=-32)
     agent = QRDQN(
-        state_size=33,
+        state_size=37,
         action_size=4,
-        memory_size=500000,
+        memory_size=50000,
         batch_size=256,
-        learning_rate=0.0001
+        learning_rate=0.001
     )
 
     max_score_ever = float('-inf')
@@ -150,10 +150,15 @@ def quick_evaluate(model_path, num_episodes):
 def find_checkpoint():
     """Find available checkpoint files"""
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))  # Go up 3 levels to reach project root
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))   # Can be modified
     
     checkpoint_files = [
-        'qrdqn_checkpoint_1000.pth'
+        'qrdqn_checkpoint_100.pth',
+        'qrdqn_checkpoint_200.pth',
+        'qrdqn_checkpoint_300.pth',
+        'qrdqn_checkpoint_400.pth',
+        'qrdqn_checkpoint_500.pth',
+        'final_model.pth'
     ]
     
     # First check project root

@@ -17,19 +17,20 @@ class PrioritizedReplayBuffer:
         self.priorities = np.zeros(capacity, dtype=np.float32)
         self.pos = 0
 
-    # Add this method
     def __len__(self):
         return len(self.buffer)
         
-    def push(self, state, action, reward, next_state, done):
+    def push(self, state, action, reward, next_state, done, priority=None):
+
         max_priority = np.max(self.priorities) if self.buffer else 1.0
+        priority = priority if priority is not None else max_priority
         
         if len(self.buffer) < self.capacity:
             self.buffer.append((state, action, reward, next_state, done))
         else:
             self.buffer[self.pos] = (state, action, reward, next_state, done)
         
-        self.priorities[self.pos] = max_priority
+        self.priorities[self.pos] = priority
         self.pos = (self.pos + 1) % self.capacity
     
     def sample(self, batch_size, beta=0.4):
@@ -61,26 +62,33 @@ class PrioritizedReplayBuffer:
         for idx, priority in zip(indices, priorities):
             self.priorities[idx] = priority
 
-def calculate_auxiliary_reward(state):
-    # Count empty cells
+def calculate_auxiliary_reward(state, reward, max_tile):
+    """Enhanced reward function"""
+    auxiliary_reward = 0
+    
+    # Base reward from environment
+    if reward > 0:  # Valid merge
+        auxiliary_reward += np.log2(reward) * 0.2
+    
+    # Bonus for reaching new max tiles
+    if max_tile >= 256:
+        auxiliary_reward += 100
+    elif max_tile >= 128:
+        auxiliary_reward += 50
+    elif max_tile >= 64:
+        auxiliary_reward += 20
+    
+    # Strategic rewards
     empty_cells = np.sum(state == 0)
-    empty_reward = empty_cells * 0.1  # Reward for each empty cell
+    auxiliary_reward += empty_cells * 0.2  # Reward for keeping space
     
-    # Reward for maintaining high values in corners
+    # Corner bonus
     corners = [state[0,0], state[0,-1], state[-1,0], state[-1,-1]]
-    corner_reward = max(corners) * 0.05
+    max_corner = max(corners)
+    if max_corner == max_tile:
+        auxiliary_reward += max_tile * 0.1  # Bonus for keeping max tile in corner
     
-    # Reward for monotonic patterns
-    monotonic_reward = 0
-    for i in range(4):
-        row = state[i,:]
-        col = state[:,i]
-        if np.all(np.diff(row) >= 0) or np.all(np.diff(row) <= 0):
-            monotonic_reward += 0.5
-        if np.all(np.diff(col) >= 0) or np.all(np.diff(col) <= 0):
-            monotonic_reward += 0.5
-            
-    return empty_reward + corner_reward + monotonic_reward
+    return auxiliary_reward
 
 
 def plot_training_results(episode_rewards, max_tiles, episode_num, save_dir='training_plots'):
@@ -101,7 +109,7 @@ def plot_training_results(episode_rewards, max_tiles, episode_num, save_dir='tra
     plt.title(f'Episode Rewards Over Time (Episode {episode_num})')
     plt.xlabel('Episode')
     plt.ylabel('Total Reward')
-    if len(episode_rewards) >= 100:  # Only show legend if we have both plots
+    if len(episode_rewards) >= 100:  
         plt.legend()
     plt.grid(True, alpha=0.3)
     
@@ -115,7 +123,7 @@ def plot_training_results(episode_rewards, max_tiles, episode_num, save_dir='tra
     plt.title(f'Max Tile Values Over Time (Episode {episode_num})')
     plt.xlabel('Episode')
     plt.ylabel('Max Tile Value')
-    if len(max_tiles) >= 100:  # Only show legend if we have both plots
+    if len(max_tiles) >= 100:  
         plt.legend()
     plt.grid(True, alpha=0.3)
     
@@ -130,19 +138,26 @@ def train():
     env = Game2048Env(board_size=4, penalty=-32)
     state_size = 16
     action_size = 4
+
+    target_update_freq = 1000  # Update target network every 1000 steps
+    total_steps = 0
     
     # Training parameters
     batch_size = 256
-    learning_rate = 0.0001
-    memory_size = 500000
+    learning_rate = 0.001
+    memory_size = 50000
+    gamma = 0.99  # Discount factor
+    tau = 0.005  # Soft update parameter
     
     # Initialize agent with parameters
     agent = QRDQN(
-        state_size=33,  # Increased for additional features
+        state_size=37,  # Increased for additional features
         action_size=4,
         memory_size=memory_size,
         batch_size=batch_size,
-        learning_rate=learning_rate
+        learning_rate=learning_rate,
+        gamma=gamma,
+        tau=tau
     )
 
     # Add prioritized experience replay
@@ -152,11 +167,11 @@ def train():
     max_reward_episode = 0
     
     # Training loop parameters
-    episodes = 50000  # Increased episodes
-    max_steps = 2000
+    episodes = 500  # Increased episodes
+    max_steps = 1000
     epsilon_start = 1.0
     epsilon_end = 0.01
-    epsilon_decay = 0.9997  # Slower decay
+    epsilon_decay = 0.991  # Slower decay
     
     # Tracking metrics
     episode_rewards = []
@@ -169,25 +184,34 @@ def train():
             max_tile = 0
             
             for step in range(max_steps):
-                # Reshape state for CNN and add features
-                state_2d = state.reshape(4, 4)
-                auxiliary_reward = calculate_auxiliary_reward(state_2d)
 
-                # Preprocess state with the agent's preprocess_state method
+                state_2d = state.reshape(4, 4)
                 processed_state = agent.preprocess_state(state_2d)
 
-                action = agent.select_action(processed_state, epsilon)
+                # Use dynamic epsilon
+                current_epsilon = agent.get_dynamic_epsilon(max_tile, epsilon)
+                action = agent.select_action(processed_state, current_epsilon)
+                
                 next_state, reward, done, info = env.step(action)
-
-                # Add auxiliary reward
+                
+                # Enhanced reward shaping
+                auxiliary_reward = calculate_auxiliary_reward(state_2d, reward, max_tile)
+                
                 total_reward = reward + auxiliary_reward
 
                 # Preprocess next state
                 next_state_2d = next_state.reshape(4, 4)
                 processed_next_state = agent.preprocess_state(next_state_2d)
 
-                agent.memory.push(processed_state, action, total_reward, processed_next_state, done)
+                priority = abs(total_reward) + 1e-6  # Priority based on reward magnitude
+                agent.memory.push(processed_state, action, total_reward, processed_next_state, done, priority)
+                
                 loss = agent.train_step()
+                total_steps += 1
+
+                # Update target network periodically
+                if total_steps % target_update_freq == 0:
+                    agent.target_net.load_state_dict(agent.policy_net.state_dict())
 
                 state = next_state
                 episode_reward += total_reward
@@ -195,15 +219,35 @@ def train():
                 if done:
                     break
             
+            if episode_reward > max_reward_ever:
+                max_reward_ever = episode_reward
+                max_reward_episode = episode + 1
+                # Save best model
+                torch.save({
+                    'model_state_dict': agent.policy_net.state_dict(),
+                    'optimizer_state_dict': agent.optimizer.state_dict(),
+                    'episode': episode,
+                    'reward': max_reward_ever,
+                }, 'best_model.pth')
+            
             epsilon = max(epsilon_end, epsilon * epsilon_decay)
             episode_rewards.append(float(episode_reward))
             max_tiles.append(float(max_tile))
-            
-            # Plot every 500 episodes
-            if (episode + 1) % 500 == 0:
+
+            # Plot every 250 episodes instead of 500
+            if (episode + 1) % 250 == 0:  # Changed from 500 to 250
                 plot_training_results(episode_rewards, max_tiles, episode + 1)
                 np.save(f'episode_rewards_{episode+1}.npy', episode_rewards)
                 np.save(f'max_tiles_{episode+1}.npy', max_tiles)
+                        
+            # Plot every 500 episodes
+            # Save more frequently
+            if (episode + 1) % 100 == 0:  # Every 100 episodes
+                torch.save({
+                    'model_state_dict': agent.policy_net.state_dict(),
+                    'optimizer_state_dict': agent.optimizer.state_dict(),
+                    'episode': episode,
+                }, f'qrdqn_checkpoint_{episode+1}.pth')
             
             # Print stats every 100 episodes
             if (episode + 1) % 100 == 0:
@@ -216,13 +260,7 @@ def train():
                 print(f"Best Reward Ever: {max_reward_ever:.2f} (Episode {max_reward_episode})")
                 print("------------------------")
                 env.render()
-            
-            # Save model checkpoint every 1000 episodes
-            if (episode + 1) % 1000 == 0:
-                torch.save({
-                    'model_state_dict': agent.policy_net.state_dict(),
-                    'optimizer_state_dict': agent.optimizer.state_dict(),
-                }, f'qrdqn_checkpoint_{episode+1}.pth')
+        
                 
     except KeyboardInterrupt:
         print("\nTraining interrupted! Saving final plot and data...")
