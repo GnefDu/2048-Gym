@@ -68,19 +68,21 @@ def calculate_auxiliary_reward(state, reward, max_tile):
     
     # Base reward from environment
     if reward > 0:  # Valid merge
-        auxiliary_reward += np.log2(reward) * 0.2
+        auxiliary_reward += np.log2(reward) * 0.3
     
-    # Bonus for reaching new max tiles
+    # Progressive tile bonuses
     if max_tile >= 256:
-        auxiliary_reward += 100
+        auxiliary_reward += 200
     elif max_tile >= 128:
-        auxiliary_reward += 50
+        auxiliary_reward += 100
     elif max_tile >= 64:
-        auxiliary_reward += 20
+        auxiliary_reward += 30
+    elif max_tile >= 32:
+        auxiliary_reward += 10
     
     # Strategic rewards
     empty_cells = np.sum(state == 0)
-    auxiliary_reward += empty_cells * 0.2  # Reward for keeping space
+    auxiliary_reward += empty_cells * 0.3  # Reward for keeping space
     
     # Corner bonus
     corners = [state[0,0], state[0,-1], state[-1,0], state[-1,-1]]
@@ -88,6 +90,15 @@ def calculate_auxiliary_reward(state, reward, max_tile):
     if max_corner == max_tile:
         auxiliary_reward += max_tile * 0.1  # Bonus for keeping max tile in corner
     
+    # Monotonicity reward (keeping large numbers together)
+    for i in range(4):
+        row = state[i,:]
+        col = state[:,i]
+        if all(row[j] >= row[j+1] for j in range(3)):
+            auxiliary_reward += 5
+        if all(col[j] >= col[j+1] for j in range(3)):
+            auxiliary_reward += 5
+            
     return auxiliary_reward
 
 
@@ -136,17 +147,23 @@ def plot_training_results(episode_rewards, max_tiles, episode_num, save_dir='tra
 def train_quick():
     env = Game2048Env(board_size=4)
     agent = QRDQN(
-        state_size=37,  # Updated to match the preprocessed state size
+        state_size=37, 
         action_size=4,
         memory_size=10000,
-        batch_size=64
+        batch_size=256
     )
     
-    max_steps_per_episode = 200
+    max_steps_per_episode = 500
     best_game_score = float('-inf')
     best_max_tile = 0
+
+    # Add lists to store metrics
+    episode_rewards = []
+    episode_max_tiles = []
+    episode_num = 100
+    tile_frequencies = {}
     
-    for episode in range(10):
+    for episode in range(episode_num):
         state = env.reset()
         game_score = 0
         total_reward = 0
@@ -157,21 +174,25 @@ def train_quick():
             max_tile = max(max_tile, current_max_tile)
             
             epsilon = agent.get_dynamic_epsilon(max_tile, 0.3)
-            
-            # No need to preprocess here as select_action handles it
             action = agent.select_action(state, epsilon)
             next_state, reward, done, info = env.step(action)
 
             # Update max_tile after action too
             current_max_tile = np.max(next_state)
             max_tile = max(max_tile, current_max_tile)
+
+            # Update tile frequencies
+            unique, counts = np.unique(next_state, return_counts=True)
+            
+            for tile, count in zip(unique, counts):
+                tile_frequencies[tile] = tile_frequencies.get(tile, 0) + count
             
             # Store transition with preprocessed states
             agent.memory.push(
-                state,  # Original state, will be preprocessed in train_step
+                state,  
                 action,
                 reward,
-                next_state,  # Original next_state, will be preprocessed in train_step
+                next_state, 
                 done
             )
             
@@ -187,15 +208,33 @@ def train_quick():
             if done:
                 break
         
+        # Store episode metrics
+        episode_rewards.append(game_score)
+        episode_max_tiles.append(max_tile)
+        
         best_game_score = max(best_game_score, game_score)
         best_max_tile = max(best_max_tile, max_tile)
         
-        print(f"Episode {episode + 1}/10")
+        print(f"Episode {episode + 1}/{episode_num}")
         print(f"Game Score: {game_score}")
         print(f"Max Tile: {max_tile}")
         print(f"Best Game Score So Far: {best_game_score}")
         print(f"Best Max Tile So Far: {best_max_tile}")
         print("-" * 50)
+
+    # Calculate averages
+    avg_game_score = np.mean(episode_rewards)
+    avg_max_tile = np.mean(episode_max_tiles)
+
+    # Print final metrics
+    print("Training Summary")
+    print(f"Best Game Score: {best_game_score}")
+    print(f"Best Max Tile: {best_max_tile}")
+    print(f"Average Game Score: {avg_game_score:.2f}")
+    print(f"Average Max Tile: {avg_max_tile:.2f}")
+
+    # Generate final plot
+    plot_training_results(episode_rewards, episode_max_tiles, episode_num)
 
 if __name__ == "__main__":
     train_quick()

@@ -85,7 +85,7 @@ class ReplayBuffer:
 
 class QRDQN:
     def __init__(self, state_size, action_size, memory_size=50000, batch_size=256):
-        self.state_size = 37  # Hardcoded to match saved model's input size
+        self.state_size = 37  
         self.action_size = action_size
         self.memory_size = memory_size
         self.batch_size = batch_size
@@ -178,9 +178,13 @@ class QRDQN:
         return state
 
     def get_dynamic_epsilon(self, max_tile, base_epsilon):
-        """Simplified epsilon strategy for quick training"""
-        if max_tile >= 128:
+        """More granular epsilon strategy"""
+        if max_tile >= 256:
+            return 0.05
+        elif max_tile >= 128:
             return 0.1
         elif max_tile >= 64:
+            return 0.15
+        elif max_tile >= 32:
             return 0.2
-        return 0.3  # Higher base epsilon for more exploration
+        return 0.3  
